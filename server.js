@@ -467,12 +467,29 @@ app.post('/api/ai', auth, async (req, res) => {
 const TTS_VOICE = process.env.TTS_VOICE || 'th-TH-PremwadeeNeural'; // เสียงผู้หญิงไทยอ่อนหวาน (ฟรี ไม่ต้องคีย์)
 const GROQ_API_KEY = process.env.GROQ_API_KEY || ''; // สำหรับ Whisper STT — สมัครฟรีที่ console.groq.com
 
-// 🔊 ข้อความ → เสียงสลี่ (edge-tts ฟรี)
+// 🔊 ข้อความ → เสียงสลี่ (msedge-tts Node ล้วน — ไม่ต้องพึ่ง Python; fallback: edge-tts Python)
 app.post('/api/tts', auth, async (req, res) => {
   const text = ((req.body || {}).text || '').toString().trim();
   if (!text) return res.status(400).json({ ok: false, error: 'ไม่มีข้อความ' });
   if (text.length > 2000) return res.status(400).json({ ok: false, error: 'ข้อความยาวเกินไป' });
   const voice = (req.body && req.body.voice) || (req.user && req.user.settings && req.user.settings.voice) || TTS_VOICE;
+  // วิธีหลัก: msedge-tts (Microsoft Edge Read Aloud — Node ล้วน ฟรี ทำงานบน Render ได้)
+  try {
+    const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
+    const tts = new MsEdgeTTS();
+    await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+    const { audioStream } = tts.toStream(String(text).slice(0, 1900), { rate: 0, pitch: '0Hz', volume: 0 });
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('X-Sali-Voice', voice);
+    let ttsErr = null;
+    audioStream.on('error', e => { ttsErr = e; if (!res.headersSent) res.status(500).json({ ok: false, error: 'TTS ล้มเหลว: ' + e.message }); else res.end(); });
+    audioStream.on('end', () => { if (!ttsErr && !res.writableEnded) res.end(); });
+    audioStream.pipe(res);
+    return;
+  } catch (e) {
+    console.log('[tts] msedge-tts ล้ม: ' + e.message + ' — ลอง edge-tts (Python)');
+  }
+  // วิธีสำรอง: edge-tts (Python) ถ้ามีติดตั้ง
   const outFile = path.join(os.tmpdir(), 'sali_' + Date.now() + '_' + Math.floor(Math.random() * 9999) + '.mp3');
   execFile('python3', ['-m', 'edge_tts', '--voice', voice, '--text', text, '--write-media', outFile], { timeout: 45000 }, (err) => {
     if (err || !fs.existsSync(outFile)) {
@@ -483,8 +500,7 @@ app.post('/api/tts', auth, async (req, res) => {
     res.setHeader('X-Sali-Voice', voice);
     fs.createReadStream(outFile).on('close', () => { try { fs.unlinkSync(outFile); } catch (e) {} }).pipe(res);
   });
-});
-
+})
 // 🎤 เสียงพี่นุ → ข้อความ (Whisper Large v3 ผ่าน Groq — สมัครคีย์ฟรี)
 app.post('/api/stt', auth, upload.single('audio'), async (req, res) => {
   if (!GROQ_API_KEY) return res.status(400).json({ ok: false, error: 'ยังไม่ได้ตั้งคีย์ Groq — สมัครฟรีที่ https://console.groq.com แล้วใส่ GROQ_API_KEY' });
