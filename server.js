@@ -340,40 +340,53 @@ async function yandexChat(messages) {
 }
 
 /* ---- Gemini (Google AI Studio / Generative Language API) ---- */
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+// รองรับหลาย keys: GEMINI_API_KEYS="k1,k2,k3" หรือ GEMINI_API_KEY + GEMINI_API_KEY2 + GEMINI_API_KEY3
+const GEMINI_API_KEYS = (process.env.GEMINI_API_KEYS || '')
+  .split(',').map(k => k.trim()).filter(Boolean)
+  .concat([process.env.GEMINI_API_KEY || '', process.env.GEMINI_API_KEY2 || '', process.env.GEMINI_API_KEY3 || ''])
+  .filter(Boolean);
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+let geminiKeyIdx = 0; // ตัวนับหมุนเวียน (round-robin) ให้ทุก key ได้ใช้
 
 async function geminiChat(messages) {
-  if (!GEMINI_API_KEY) return null;
-  try {
-    const contents = [];
-    let sys = '';
-    for (const m of messages) {
-      const text = String(m.content || '');
-      if (m.role === 'system') { sys += (sys ? '\n' : '') + text; continue; }
-      contents.push({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: text.slice(0, 2000) }] });
-    }
-    if (!contents.length) contents.push({ role: 'user', parts: [{ text: 'สวัสดี' }] });
-    const body = {
-      contents,
-      generationConfig: { temperature: 0.7, maxOutputTokens: 800 }
-    };
-    if (sys) body.systemInstruction = { parts: [{ text: sys.slice(0, 4000) }] };
-    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + GEMINI_API_KEY, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const j = await r.json();
-    if (!r.ok) {
-      const msg = (j.error && j.error.message) || '';
-      if (r.status === 401 || r.status === 403 || /quota|permission|invalid|api key/i.test(msg)) return null;
-      throw new Error('Gemini ' + r.status + ': ' + msg.slice(0, 100));
-    }
-    const reply = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts && j.candidates[0].content.parts[0] && j.candidates[0].content.parts[0].text;
-    if (!reply) return null;
-    return { provider: 'gemini', model: GEMINI_MODEL, reply };
-  } catch (e) { return null; }
+  if (!GEMINI_API_KEYS.length) return null;
+  const contents = [];
+  let sys = '';
+  for (const m of messages) {
+    const text = String(m.content || '');
+    if (m.role === 'system') { sys += (sys ? '\n' : '') + text; continue; }
+    contents.push({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: text.slice(0, 2000) }] });
+  }
+  if (!contents.length) contents.push({ role: 'user', parts: [{ text: 'สวัสดี' }] });
+  const body = {
+    contents,
+    generationConfig: { temperature: 0.7, maxOutputTokens: 800 }
+  };
+  if (sys) body.systemInstruction = { parts: [{ text: sys.slice(0, 4000) }] };
+  const n = GEMINI_API_KEYS.length;
+  const start = geminiKeyIdx++ % n; // หมุนไปเรื่อย ๆ ทุกคำถาม
+  for (let i = 0; i < n; i++) { // วนครบทุก key จนกว่าจะได้คำตอบ
+    const key = GEMINI_API_KEYS[(start + i) % n];
+    try {
+      const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + key, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        const msg = (j.error && j.error.message) || '';
+        const bad = r.status === 401 || r.status === 403 || /quota|permission|invalid|api key|high demand|unavailable/i.test(msg);
+        if (bad) continue; // key นี้ใช้ไม่ได้ → ลอง key ถัดไป
+        throw new Error('Gemini ' + r.status + ': ' + msg.slice(0, 100));
+      }
+      const reply = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts && j.candidates[0].content.parts[0] && j.candidates[0].content.parts[0].text;
+      if (!reply) continue;
+      console.log('[gemini] ตอบด้วย key#' + ((start + i) % n + 1) + '/' + n);
+      return { provider: 'gemini', model: GEMINI_MODEL, reply };
+    } catch (e) { continue; }
+  }
+  return null;
 }
 
 async function askAI(user, question, history) {
