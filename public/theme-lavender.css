@@ -148,9 +148,9 @@ body::before {
 }
 @keyframes shine { to { background-position: -200% 0; } }
 .hero-card h2 { color: var(--text); }
-.hero-card p { color: #6d5da8; }
+.hero-card p { color: #57498f; }
 .progress { background: rgba(139,92,246,.14); }
-.progress-lbl { color: #7a6fae; }
+.progress-lbl { color: #5d5491; }
 
 /* ---------- Profile ---------- */
 .profile-card {
@@ -175,11 +175,11 @@ body::before {
 }
 .online-pill { background: rgba(16,185,129,.1); border: 1px solid rgba(16,185,129,.32); color: #047857; }
 .pro-pill { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.32); }
-.pill.gold { background: linear-gradient(135deg, rgba(245,158,11,.16), rgba(168,85,247,.16)); border: 1px solid rgba(245,158,11,.4); }
+.pill.gold { background: linear-gradient(135deg, rgba(245,158,11,.16), rgba(168,85,247,.16)); border: 1px solid rgba(245,158,11,.45); color: #b45309; }
 
 /* ---------- อื่นๆ ---------- */
 .welcome-name { color: var(--text); }
-.welcome-hi { color: var(--muted); }
+.welcome-hi { color: #5d5491; }
 .skeleton { background: linear-gradient(90deg, rgba(139,92,246,.05), rgba(139,92,246,.14), rgba(139,92,246,.05)); background-size: 200% 100%; }
 .ms-num { background: rgba(255,255,255,.85); color: var(--muted); }
 .ms.done { border-color: rgba(16,185,129,.4); background: rgba(16,185,129,.06); background-clip: padding-box; }
@@ -331,3 +331,7 @@ body::before {
   .modal-box { border-radius: 26px; margin-bottom: 20px; }
   .voice-btn { max-width: 160px; }
 }
+
+/* ---------- ความคมชัดเพิ่มเติม (หลัง base style.css) ---------- */
+.stat-up { color: #047857; }
+.tx-amt { color: #047857; }
