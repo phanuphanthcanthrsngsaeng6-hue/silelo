@@ -1,0 +1,333 @@
+/* ==========================================================================
+   🌸 ธีม Lavender Glass — ขอบลอย + เส้นไล่เฉดสวยๆ (ต่อท้าย style.css)
+   ออกแบบตาม reference: พื้นลาเวนเดอร์อ่อน + สีม่วงสด #9974F5 + เส้นขอบละเอียด
+   ========================================================================== */
+
+:root {
+  --bg: #f4f1fe;
+  --bg-2: #ece5fb;
+  --surface: rgba(255,255,255,.72);
+  --surface-2: rgba(255,255,255,.9);
+  --border: rgba(139,92,246,.16);
+  --text: #2b2252;
+  --muted: #6b61a0;
+  --indigo: #8b5cf6;
+  --cyan: #0ea5e9;
+  --violet: #a78bfa;
+  --green: #10b981;
+  --amber: #f59e0b;
+  --red: #f43f5e;
+  --grad: linear-gradient(120deg, #8b5cf6 0%, #a855f7 45%, #d946ef 100%);
+  --radius: 20px;
+}
+
+/* ---------- พื้นหลัง: ลาเวนเดอร์ + วงแสงลอย ---------- */
+body {
+  background:
+    radial-gradient(900px 520px at 88% -8%, rgba(217,70,239,.18), transparent 62%),
+    radial-gradient(820px 540px at -12% 18%, rgba(99,102,241,.20), transparent 62%),
+    radial-gradient(760px 620px at 50% 112%, rgba(56,189,248,.14), transparent 62%),
+    linear-gradient(180deg, #f8f5ff 0%, #efeafc 55%, #f3eefd 100%);
+  color: var(--text);
+}
+
+/* ลายเส้นสวยๆ: จุดกริดละเอียด + เส้นเฉียงบางๆ วิ่งทั่วพื้น */
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background-image:
+    radial-gradient(rgba(139,92,246,.13) 1px, transparent 1.4px),
+    repeating-linear-gradient(45deg, rgba(139,92,246,.045) 0 1px, transparent 1px 10px);
+  background-size: 24px 24px, 100% 100%;
+}
+
+/* ============ AUTH ============ */
+.auth-screen {
+  background:
+    radial-gradient(760px 460px at 88% -6%, rgba(217,70,239,.22), transparent 62%),
+    radial-gradient(680px 460px at -6% 22%, rgba(99,102,241,.24), transparent 62%),
+    radial-gradient(720px 540px at 50% 116%, rgba(56,189,248,.16), transparent 62%),
+    linear-gradient(180deg, #f9f6ff 0%, #f0eafd 60%, #f4effe 100%);
+}
+.auth-glow::before { background: radial-gradient(circle, #a78bfa, transparent 65%); opacity: .55; }
+.auth-glow::after  { background: radial-gradient(circle, #f0abfc, transparent 65%); opacity: .5; }
+.auth-box h1 { color: var(--text); }
+.auth-sub { color: var(--muted); }
+.auth-tabs { background: rgba(255,255,255,.78); border: 1px solid rgba(139,92,246,.22); box-shadow: 0 10px 30px -18px rgba(109,40,217,.35); }
+.auth-tab { color: var(--muted); }
+.auth-tab.active { background: var(--grad); color: #fff; box-shadow: 0 10px 24px -8px rgba(168,85,247,.6); }
+.field input {
+  background: rgba(255,255,255,.88); border: 1.5px solid transparent; color: var(--text);
+  background: linear-gradient(#fff, #fff) padding-box,
+    linear-gradient(90deg, rgba(139,92,246,.45), rgba(217,70,239,.3)) border-box;
+  box-shadow: 0 10px 26px -18px rgba(109,40,217,.35);
+}
+.field input:focus { border-color: #8b5cf6; box-shadow: 0 0 0 3px rgba(139,92,246,.16); }
+.btn-primary { background: var(--grad); box-shadow: 0 14px 30px -10px rgba(168,85,247,.6); }
+.btn-demo { border: 1px dashed rgba(14,165,233,.45); background: rgba(14,165,233,.07); color: #0891b2; }
+
+/* ============ HEADER ============ */
+.app-header {
+  position: relative;
+  background: rgba(255,255,255,.78);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  border-bottom: none;
+  box-shadow: 0 12px 30px -20px rgba(109,40,217,.4);
+}
+/* เส้นไล่เฉดใต้ header */
+.app-header::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1.5px;
+  background: linear-gradient(90deg, transparent, rgba(139,92,246,.55), rgba(217,70,239,.45), transparent);
+}
+.h-title { color: var(--text); }
+.h-sub { color: var(--muted); }
+.h-logo, .mini-avatar { background: linear-gradient(135deg, #7c3aed, #c026d3); box-shadow: 0 10px 22px -8px rgba(168,85,247,.6); }
+
+/* ============ TAB BAR ============ */
+.tabbar {
+  position: relative;
+  background: rgba(255,255,255,.86);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-top: none;
+  box-shadow: 0 -10px 34px -16px rgba(109,40,217,.35);
+}
+.tabbar::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1.5px;
+  background: linear-gradient(90deg, transparent, rgba(139,92,246,.5), rgba(217,70,239,.4), transparent);
+}
+.tab { color: var(--muted); position: relative; }
+.tab.active { color: #7e22ce; }
+.tab.active svg { filter: drop-shadow(0 0 9px rgba(139,92,246,.6)); }
+/* เส้นไล่เฉดใต้แท็บ active */
+.tab.active::after {
+  content: ""; position: absolute; bottom: 8px; width: 22px; height: 3px; border-radius: 99px;
+  background: var(--grad); box-shadow: 0 2px 8px rgba(168,85,247,.55);
+}
+
+/* ============ การ์ดลอย: แก้ว + ขอบไล่เฉด + เงาลอย ============ */
+.glass, .stat-card, .quick, .menu-item, .ms, .chart-card, .tx-full, .pay-method,
+.suggest, .mem-item, .about-stats div {
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(165deg, rgba(255,255,255,.95), rgba(255,255,255,.7)) padding-box,
+    linear-gradient(135deg, rgba(139,92,246,.5), rgba(217,70,239,.24), rgba(14,165,233,.38)) border-box;
+  box-shadow: 0 18px 40px -18px rgba(109,40,217,.26), 0 2px 8px rgba(109,40,217,.05);
+}
+.glass { color: var(--muted); }
+.stat-card:active, .quick:active { transform: scale(.96); }
+.stat-num { color: var(--text); }
+.stat-lbl { color: var(--muted); }
+.stat-ic.blue { background: rgba(139,92,246,.15); color: #8b5cf6; }
+.stat-ic.violet { background: rgba(167,139,250,.16); color: #a855f7; }
+.quick { color: var(--text); }
+.quick:active { border-color: transparent; }
+.q-ic.cyan { filter: drop-shadow(0 4px 10px rgba(14,165,233,.4)); }
+.q-ic.violet { filter: drop-shadow(0 4px 10px rgba(168,85,247,.4)); }
+.q-ic.gold { filter: drop-shadow(0 4px 10px rgba(245,158,11,.4)); }
+.q-ic.green { filter: drop-shadow(0 4px 10px rgba(16,185,129,.4)); }
+.tx-amt { color: var(--green); }
+
+/* ---------- Hero card: ไฮไลต์ + เส้นวิ่ง ---------- */
+.hero-card {
+  position: relative;
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(140deg, rgba(139,92,246,.15), rgba(217,70,239,.09), rgba(255,255,255,.88)) padding-box,
+    linear-gradient(135deg, rgba(139,92,246,.65), rgba(217,70,239,.35), rgba(14,165,233,.45)) border-box;
+  box-shadow: 0 28px 60px -24px rgba(109,40,217,.45);
+}
+.hero-card::after {
+  width: 240px; height: 240px; right: -80px; top: -90px;
+  background: radial-gradient(circle, rgba(217,70,239,.28), transparent 65%);
+}
+/* แท่งไล่เฉดด้านบน + เส้นวิ่ง */
+.hero-card::before {
+  content: ""; position: absolute; top: 0; left: 20px; width: 74px; height: 4px; border-radius: 99px;
+  background: linear-gradient(90deg, #8b5cf6, #d946ef, #8b5cf6); background-size: 200% 100%;
+  animation: shine 3.6s linear infinite;
+  box-shadow: 0 6px 16px rgba(168,85,247,.55);
+}
+@keyframes shine { to { background-position: -200% 0; } }
+.hero-card h2 { color: var(--text); }
+.hero-card p { color: #6d5da8; }
+.progress { background: rgba(139,92,246,.14); }
+.progress-lbl { color: #7a6fae; }
+
+/* ---------- Profile ---------- */
+.profile-card {
+  background:
+    linear-gradient(160deg, rgba(139,92,246,.16), rgba(217,70,239,.10), rgba(255,255,255,.86)) padding-box,
+    linear-gradient(135deg, rgba(139,92,246,.6), rgba(217,70,239,.35)) border-box;
+  border: 1.5px solid transparent;
+  box-shadow: 0 26px 55px -22px rgba(109,40,217,.4);
+}
+.profile-avatar {
+  background: linear-gradient(135deg, #7c3aed, #c026d3); border: 3px solid rgba(255,255,255,.85);
+  box-shadow: 0 16px 36px -10px rgba(168,85,247,.6);
+}
+.profile-card h2 { color: var(--text); }
+
+/* ---------- Pills / banners ---------- */
+.vip-banner {
+  background: linear-gradient(135deg, rgba(245,158,11,.12), rgba(168,85,247,.14));
+  border: 1px solid rgba(245,158,11,.35);
+  background-clip: padding-box;
+  color: var(--text);
+}
+.online-pill { background: rgba(16,185,129,.1); border: 1px solid rgba(16,185,129,.32); color: #047857; }
+.pro-pill { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.32); }
+.pill.gold { background: linear-gradient(135deg, rgba(245,158,11,.16), rgba(168,85,247,.16)); border: 1px solid rgba(245,158,11,.4); }
+
+/* ---------- อื่นๆ ---------- */
+.welcome-name { color: var(--text); }
+.welcome-hi { color: var(--muted); }
+.skeleton { background: linear-gradient(90deg, rgba(139,92,246,.05), rgba(139,92,246,.14), rgba(139,92,246,.05)); background-size: 200% 100%; }
+.ms-num { background: rgba(255,255,255,.85); color: var(--muted); }
+.ms.done { border-color: rgba(16,185,129,.4); background: rgba(16,185,129,.06); background-clip: padding-box; }
+.ms.pending { border-color: rgba(245,158,11,.3); background-clip: padding-box; }
+.ms .pay-btn { background: var(--grad); box-shadow: 0 8px 18px -6px rgba(168,85,247,.55); }
+.slider { background: rgba(139,92,246,.2); }
+.insight-card { border-color: rgba(14,165,233,.35); background-clip: padding-box; }
+.about-card h3 { color: var(--text); }
+
+/* ============ CHAT ============ */
+.msg.ai .bubble {
+  background:
+    linear-gradient(165deg, rgba(255,255,255,.96), rgba(255,255,255,.78)) padding-box,
+    linear-gradient(135deg, rgba(139,92,246,.5), rgba(217,70,239,.26)) border-box;
+  border: 1.5px solid transparent;
+  box-shadow: 0 12px 26px -16px rgba(109,40,217,.3);
+}
+.msg.bot .bubble {
+  background:
+    linear-gradient(160deg, rgba(139,92,246,.13), rgba(217,70,239,.09), rgba(255,255,255,.9)) padding-box,
+    linear-gradient(135deg, rgba(139,92,246,.55), rgba(217,70,239,.35)) border-box;
+  border: 1.5px solid transparent;
+}
+.msg.bot .meta { color: #7e22ce; }
+.msg.me .bubble { background: linear-gradient(120deg, #7c3aed, #c026d3); color: #fff; border: none; box-shadow: 0 12px 26px -10px rgba(168,85,247,.55); }
+.typing-bubble span { background: #c4b5fd; }
+
+/* ปุ่ม suggestion + ช่องพิมพ์ */
+.suggest { border: 1.5px solid rgba(14,165,233,.3); background: rgba(14,165,233,.08); color: #0891b2; }
+.suggest:active { background: rgba(14,165,233,.18); }
+.input-bar input {
+  background:
+    linear-gradient(#fff, #fff) padding-box,
+    linear-gradient(90deg, rgba(139,92,246,.45), rgba(217,70,239,.3), rgba(14,165,233,.4)) border-box;
+  border: 1.5px solid transparent;
+  color: var(--text); box-shadow: 0 12px 28px -18px rgba(109,40,217,.4);
+}
+.input-bar input::placeholder { color: #b3acd6; }
+.send-btn { background: var(--grad); box-shadow: 0 10px 24px -8px rgba(168,85,247,.6); }
+
+/* ============ MAP ============ */
+.leaflet-tile-pane { filter: none; }
+.leaflet-container, #map { background: #eef0ff; }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #fff; color: var(--text); border: 1px solid rgba(139,92,246,.2); }
+
+/* ============ VOICE (โทรเสียงสลี่) ============ */
+.voice-orb {
+  background: radial-gradient(circle at 30% 30%, #f0abfc, #a855f7 55%, #7c3aed);
+  box-shadow: 0 16px 46px rgba(139,92,246,.5);
+}
+.voice-orb.rec { box-shadow: 0 0 0 0 rgba(255,59,48,.6); }
+.voice-orb.cont { box-shadow: 0 0 0 4px #00c853, 0 14px 40px rgba(0,200,83,.35); }
+.voice-hint { color: #5d5491; }
+#voice-status { color: #5d5491; }
+.voice-bubble { background: rgba(139,92,246,.1); border: 1px solid rgba(139,92,246,.3); color: #7c3aed; }
+.voice-btn {
+  background:
+    linear-gradient(165deg, rgba(255,255,255,.97), rgba(255,255,255,.74)) padding-box,
+    linear-gradient(135deg, rgba(139,92,246,.5), rgba(217,70,239,.28)) border-box;
+  border: 1.5px solid transparent; color: var(--text);
+  box-shadow: 0 16px 34px -16px rgba(109,40,217,.35);
+}
+.voice-btn:active { transform: scale(.94); background: #f5efff; }
+.voice-btn small { color: var(--muted); }
+.voice-btn.call.on { background: var(--grad); border-color: transparent; box-shadow: 0 14px 30px -10px rgba(217,70,239,.65); }
+.voice-btn.call.on small { color: #fff; }
+.mic-btn { background: linear-gradient(135deg, #a855f7, #d946ef); box-shadow: 0 8px 20px -6px rgba(168,85,247,.65); }
+.mic-btn:active { background: linear-gradient(135deg, #9333ea, #c026d3); }
+.call-tab span { color: #7e22ce; }
+.voice-memories h4 { color: var(--muted); }
+.mem-chip { background: rgba(139,92,246,.09); border: 1px solid rgba(139,92,246,.25); color: #7c3aed; }
+
+/* ============ SETTINGS / MEMORY ============ */
+.set-head { color: var(--text); }
+.set-sub { color: var(--muted); }
+.persona-opt, .voice-opt {
+  background: linear-gradient(165deg, rgba(255,255,255,.95), rgba(255,255,255,.72));
+  border: 1.5px solid transparent;
+  background: linear-gradient(165deg, rgba(255,255,255,.95), rgba(255,255,255,.72)) padding-box,
+    linear-gradient(135deg, rgba(139,92,246,.4), rgba(217,70,239,.22)) border-box;
+  color: var(--text);
+  box-shadow: 0 10px 24px -16px rgba(109,40,217,.3);
+}
+.persona-opt small, .voice-opt small { color: var(--muted); }
+.persona-opt.on, .voice-opt.on {
+  border: 1.5px solid transparent;
+  background: linear-gradient(165deg, rgba(139,92,246,.14), rgba(217,70,239,.1)) padding-box,
+    linear-gradient(135deg, #8b5cf6, #d946ef) border-box;
+  box-shadow: 0 10px 24px -10px rgba(168,85,247,.45);
+}
+.voice-tag { background: rgba(139,92,246,.15); color: #7c3aed; }
+.mem-empty { color: var(--muted); }
+.mem-txt small { color: var(--muted); }
+.mem-del { background: rgba(244,63,94,.12); color: #e11d48; }
+.mem-add-row input { background: rgba(255,255,255,.92); border: 1px solid rgba(139,92,246,.22); color: var(--text); }
+.btn-danger { background: rgba(244,63,94,.1); color: #e11d48; border: 1px solid rgba(244,63,94,.3); }
+.back-btn { color: #0891b2; }
+.about-role { color: #7c3aed; }
+
+/* ============ MODAL / TOAST ============ */
+.modal { background: rgba(43,34,82,.5); backdrop-filter: blur(8px); }
+.modal-box {
+  background: rgba(255,255,255,.97);
+  border: 1px solid rgba(139,92,246,.22);
+  border-radius: 26px 26px 0 0;
+  box-shadow: 0 -20px 60px -20px rgba(109,40,217,.4);
+  color: var(--text);
+}
+.modal-head h3 { color: var(--text); }
+.pay-method.active { border-color: #8b5cf6; background: rgba(139,92,246,.1); background-clip: padding-box; }
+.qr-box { border: 1px dashed rgba(14,165,233,.45); background: rgba(14,165,233,.04); }
+.toast {
+  background: rgba(255,255,255,.94); border: 1px solid rgba(139,92,246,.35);
+  color: var(--text); box-shadow: 0 18px 50px -12px rgba(109,40,217,.45);
+}
+
+/* ============ DESKTOP: กรอบแอพลอย + แถบแท็บลอย ============ */
+@media (min-width: 768px) {
+  body {
+    background:
+      radial-gradient(1000px 620px at 82% -12%, rgba(217,70,239,.2), transparent 62%),
+      radial-gradient(900px 600px at -10% 10%, rgba(99,102,241,.22), transparent 62%),
+      radial-gradient(900px 700px at 55% 118%, rgba(56,189,248,.15), transparent 62%),
+      linear-gradient(180deg, #f8f5ff 0%, #eee8fc 60%, #f4effe 100%);
+  }
+  .app {
+    max-width: 430px;
+    margin: 18px auto;
+    height: calc(100dvh - 36px);
+    border-radius: 34px;
+    border: 1.5px solid transparent;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.66), rgba(255,255,255,.5)) padding-box,
+      linear-gradient(160deg, rgba(139,92,246,.55), rgba(217,70,239,.3), rgba(14,165,233,.4)) border-box;
+    box-shadow: 0 40px 100px -30px rgba(109,40,217,.5), 0 10px 30px -18px rgba(109,40,217,.3);
+    overflow: hidden;
+  }
+  .main { padding-bottom: 130px; }
+  .tabbar {
+    max-width: 396px; left: 50%; transform: translateX(-50%); bottom: 28px;
+    border-radius: 26px;
+    border: 1.5px solid transparent;
+    background:
+      linear-gradient(180deg, rgba(255,255,255,.92), rgba(255,255,255,.8)) padding-box,
+      linear-gradient(135deg, rgba(139,92,246,.5), rgba(217,70,239,.3)) border-box;
+    box-shadow: 0 22px 50px -18px rgba(109,40,217,.5), 0 4px 14px rgba(109,40,217,.12);
+  }
+  .tabbar::before { top: -1.5px; left: 16px; right: 16px; height: 2px; border-radius: 99px; }
+  .modal-box { border-radius: 26px; margin-bottom: 20px; }
+  .voice-btn { max-width: 160px; }
+}
