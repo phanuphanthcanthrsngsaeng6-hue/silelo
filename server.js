@@ -131,7 +131,7 @@ function publicUser(u) {
 
 /* ================== EXPRESS APP ================== */
 const app = express();
-app.use(express.json());
+app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 /* ---- Auth ---- */
@@ -765,6 +765,67 @@ app.post('/api/messages', auth, (req, res) => {
 });
 
 /* ---- Error handling ---- */
+/* ================== 💬 LINE Bot Webhook (สลี่บน LINE) ================== */
+const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET || '';
+const LINE_ACCESS_TOKEN = process.env.LINE_ACCESS_TOKEN || '';
+
+// ผู้ใช้ LINE → pseudo user (สิทธิ์เต็มเหมือนเจ้าของ)
+function lineUser(source) {
+  return {
+    id: 'line:' + (source.userId || 'unknown'),
+    name: (source.userName) ? 'LINE:' + source.userName : 'LINE',
+    role: 'owner',
+    unlimited: true,
+    plan: 'Unlimited',
+    settings: {}
+  };
+}
+
+// ตอบกลับ LINE ผ่าน reply API (ต้องภายใน 30 วิ หลังรับ event)
+async function lineReply(replyToken, text) {
+  if (!LINE_ACCESS_TOKEN) return;
+  const msg = String(text || '').slice(0, 4500);
+  try {
+    const r = await fetch('https://api.line.me/v2/bot/message/reply', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ replyToken, messages: [{ type: 'text', text: msg }] })
+    });
+    if (!r.ok) console.log('[line] reply fail:', r.status, (await r.text()).slice(0, 120));
+    else console.log('[line] ส่งข้อความถึง LINE สำเร็จ');
+  } catch (e) { console.log('[line] reply error:', e.message); }
+}
+
+async function handleLineEvent(event) {
+  if (!event || event.type !== 'message' || !event.message || event.message.type !== 'text') return;
+  const text = (event.message.text || '').trim();
+  if (!text) return;
+  const user = lineUser(event.source || {});
+  console.log('[line] ข้อความจาก LINE:', text.slice(0, 80));
+  try {
+    const result = await askAI(user, text, []);
+    const reply = (result && result.reply) ? result.reply : 'ขอโทษนะคะ ตอนนี้สลี่ตอบไม่ได้ ลองใหม่ทีหลังนะคะ 🙏';
+    await lineReply(event.replyToken, reply);
+  } catch (e) {
+    console.log('[line] AI error:', e.message);
+    await lineReply(event.replyToken, 'ขอโทษนะคะ เกิดข้อผิดพลาด ลองใหม่อีกทีนะคะ 🙏');
+  }
+}
+
+app.post('/webhook', (req, res) => {
+  // ตอบ 200 ทันทีเสมอ (LINE ต้องการ response ไว)
+  res.status(200).end();
+  if (!LINE_CHANNEL_SECRET || !LINE_ACCESS_TOKEN) return;
+  // ✅ ตรวจลายเซ็น X-Line-Signature (HMAC-SHA256 + channel secret)
+  try {
+    const sig = req.headers['x-line-signature'] || '';
+    const hash = crypto.createHmac('sha256', LINE_CHANNEL_SECRET).update(req.rawBody || Buffer.alloc(0)).digest('base64');
+    if (hash !== sig) { console.log('[line] ลายเซ็นไม่ตรง ❌'); return; }
+  } catch (e) { console.log('[line] verify error:', e.message); return; }
+  const events = (req.body && req.body.events) || [];
+  for (const ev of events) handleLineEvent(ev);
+});
+
 app.use((req, res) => res.status(404).json({ ok: false, error: 'ไม่พบเส้นทางที่ขอ' }));
 
 /* ================== 🤖 สลี๋บอท ประจำแชททีมงาน ================== */
