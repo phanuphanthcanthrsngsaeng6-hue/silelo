@@ -308,6 +308,37 @@ async function openrouterChat(messages) {
   return null; // ให้ caller fallback ไป mock
 }
 
+/* ---- YandexGPT (Yandex Cloud Foundation Models) ---- */
+const YANDEXGPT_API_KEY = process.env.YANDEXGPT_API_KEY || '';
+const YANDEXGPT_FOLDER_ID = process.env.YANDEXGPT_FOLDER_ID || '';
+const YANDEXGPT_MODEL = process.env.YANDEXGPT_MODEL || 'yandexgpt-lite/latest';
+
+async function yandexChat(messages) {
+  if (!YANDEXGPT_API_KEY || !YANDEXGPT_FOLDER_ID) return null;
+  try {
+    const r = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/completion', {
+      method: 'POST',
+      headers: { 'Authorization': 'Api-Key ' + YANDEXGPT_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        modelUri: 'gpt://' + YANDEXGPT_FOLDER_ID + '/' + YANDEXGPT_MODEL,
+        messages: messages.map(m => ({ role: m.role, text: m.content })),
+        completionOptions: { maxTokens: 800, temperature: 0.7 }
+      })
+    });
+    const j = await r.json();
+    if (!r.ok) {
+      const msg = (j.error && j.error.message) || '';
+      // key ผิด / ยังไม่ให้สิทธิ์ → ข้ามไป provider ถัดไปทันที (ไม่เสียเวลา)
+      if (r.status === 401 || r.status === 403 || /permission|unauthorized|invalid|does not match/i.test(msg)) return null;
+      throw new Error('YandexGPT ' + r.status + ': ' + msg.slice(0, 100));
+    }
+    const alts = j.result && j.result.alternatives;
+    const reply = alts && alts[0] && alts[0].message && alts[0].message.text;
+    if (!reply) return null;
+    return { provider: 'yandexgpt', model: YANDEXGPT_MODEL, reply };
+  } catch (e) { return null; }
+}
+
 async function askAI(user, question, history) {
   const msgs = [{ role: 'system', content: aiSystemPrompt(user) }];
   if (Array.isArray(history) && history.length) {
@@ -329,6 +360,8 @@ async function askAI(user, question, history) {
   if (ds) return ds;
   const or = await openrouterChat(msgs); // 🥈 โมเดลฟรี
   if (or) return or;
+  const ya = await yandexChat(msgs); // 🥉 YandexGPT (Yandex Cloud)
+  if (ya) return ya;
   await new Promise(r => setTimeout(r, 400)); // จำลอง latency
   return { provider: 'mock', reply: aiMockReply(question) };
 }
