@@ -1,0 +1,17 @@
+name: keep-alive-silelo
+# 🌟 กัน Render free instance หลับ — ping ทุก 5 นาที (ฟรี ไม่ต้องสมัครบริการอื่น)
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    name: Ping Silelo
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping web service
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" -m 20 https://silelo.onrender.com/api/health || echo "000")
+          echo "HTTP $code"
+          if [ "$code" != "200" ]; then echo "⚠️ Silelo ไม่ตอบ 200"; exit 1; fi
