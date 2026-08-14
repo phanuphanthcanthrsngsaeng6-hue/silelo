@@ -389,6 +389,37 @@ async function geminiChat(messages) {
   return null;
 }
 
+/* ---- OpenAI (รองรับหลาย keys: OPENAI_API_KEYS="k1,k2" | 1 key: OPENAI_API_KEY) ---- */
+const OPENAI_API_KEYS = (process.env.OPENAI_API_KEYS || process.env.OPENAI_API_KEY || '').split(',').map(k => k.trim()).filter(Boolean);
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+let openaiIdx = 0;
+async function openaiChat(messages) {
+  if (!OPENAI_API_KEYS.length) return null;
+  const start = (openaiIdx++) % OPENAI_API_KEYS.length;
+  for (let i = 0; i < OPENAI_API_KEYS.length; i++) {
+    const key = OPENAI_API_KEYS[(start + i) % OPENAI_API_KEYS.length];
+    try {
+      const r = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: OPENAI_MODEL, max_tokens: 800, messages })
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        const msg = (j.error && j.error.message) || '';
+        const bad = r.status === 401 || r.status === 403 || /insufficient|invalid|quota|billing/i.test(msg);
+        if (bad) { console.log('[openai] key#' + ((start + i) % OPENAI_API_KEYS.length + 1) + '/' + OPENAI_API_KEYS.length + ' ข้าม: ' + r.status + ' ' + msg.slice(0, 60)); continue; }
+        throw new Error('OpenAI ' + r.status + ': ' + msg.slice(0, 100));
+      }
+      const reply = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+      if (!reply) continue;
+      console.log('[openai] ตอบด้วย key#' + ((start + i) % OPENAI_API_KEYS.length + 1) + '/' + OPENAI_API_KEYS.length + ' (' + OPENAI_MODEL + ')');
+      return { provider: 'openai', model: OPENAI_MODEL, reply };
+    } catch (e) { continue; }
+  }
+  return null;
+}
+
 async function askAI(user, question, history) {
   const msgs = [{ role: 'system', content: aiSystemPrompt(user) }];
   if (Array.isArray(history) && history.length) {
@@ -410,6 +441,8 @@ async function askAI(user, question, history) {
   if (ds) return ds;
   const gm = await geminiChat(msgs); // 🥈 Gemini (key พี่นุ)
   if (gm) return gm;
+  const oa = await openaiChat(msgs); // 🤖 OpenAI (gpt-4o-mini)
+  if (oa) return oa;
   const or = await openrouterChat(msgs); // 🥉 โมเดลฟรี
   if (or) return or;
   const ya = await yandexChat(msgs); // 🏅 YandexGPT (Yandex Cloud)

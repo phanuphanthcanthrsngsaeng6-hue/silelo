@@ -42,6 +42,17 @@
       "plan": "Professional",
       "milestonesPaid": [],
       "createdAt": "2026-08-14T13:04:32.718Z"
+    },
+    {
+      "id": "u_83a268b67b5a",
+      "name": "ทดสอบ OpenAI",
+      "email": "oa_test@silelo.app",
+      "password": "$2a$10$HptsGGu/uHxsK8TuTRl9KegbK8Oe7eFBIfcudvqpL00rNCbwNUMYy",
+      "role": "client",
+      "country": "Thailand",
+      "plan": "Professional",
+      "milestonesPaid": [],
+      "createdAt": "2026-08-14T19:44:50.213Z"
     }
   ],
   "messages": [
