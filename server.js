@@ -339,6 +339,43 @@ async function yandexChat(messages) {
   } catch (e) { return null; }
 }
 
+/* ---- Gemini (Google AI Studio / Generative Language API) ---- */
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+
+async function geminiChat(messages) {
+  if (!GEMINI_API_KEY) return null;
+  try {
+    const contents = [];
+    let sys = '';
+    for (const m of messages) {
+      const text = String(m.content || '');
+      if (m.role === 'system') { sys += (sys ? '\n' : '') + text; continue; }
+      contents.push({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: text.slice(0, 2000) }] });
+    }
+    if (!contents.length) contents.push({ role: 'user', parts: [{ text: 'สวัสดี' }] });
+    const body = {
+      contents,
+      generationConfig: { temperature: 0.7, maxOutputTokens: 800 }
+    };
+    if (sys) body.systemInstruction = { parts: [{ text: sys.slice(0, 4000) }] };
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + GEMINI_API_KEY, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const j = await r.json();
+    if (!r.ok) {
+      const msg = (j.error && j.error.message) || '';
+      if (r.status === 401 || r.status === 403 || /quota|permission|invalid|api key/i.test(msg)) return null;
+      throw new Error('Gemini ' + r.status + ': ' + msg.slice(0, 100));
+    }
+    const reply = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts && j.candidates[0].content.parts[0] && j.candidates[0].content.parts[0].text;
+    if (!reply) return null;
+    return { provider: 'gemini', model: GEMINI_MODEL, reply };
+  } catch (e) { return null; }
+}
+
 async function askAI(user, question, history) {
   const msgs = [{ role: 'system', content: aiSystemPrompt(user) }];
   if (Array.isArray(history) && history.length) {
@@ -358,9 +395,11 @@ async function askAI(user, question, history) {
   msgs.push({ role: 'user', content: question.slice(0, 1000) });
   const ds = await deepseekChat(msgs); // 🥇 DeepSeek (คีย์พี่บอส) — เติมเงินแล้วใช้ได้ทันที
   if (ds) return ds;
-  const or = await openrouterChat(msgs); // 🥈 โมเดลฟรี
+  const gm = await geminiChat(msgs); // 🥈 Gemini (key พี่นุ)
+  if (gm) return gm;
+  const or = await openrouterChat(msgs); // 🥉 โมเดลฟรี
   if (or) return or;
-  const ya = await yandexChat(msgs); // 🥉 YandexGPT (Yandex Cloud)
+  const ya = await yandexChat(msgs); // 🏅 YandexGPT (Yandex Cloud)
   if (ya) return ya;
   await new Promise(r => setTimeout(r, 400)); // จำลอง latency
   return { provider: 'mock', reply: aiMockReply(question) };
