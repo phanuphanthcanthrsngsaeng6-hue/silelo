@@ -150,7 +150,7 @@ body::before {
 .hero-card h2 { color: var(--text); }
 .hero-card p { color: #57498f; }
 .progress { background: rgba(139,92,246,.14); }
-.progress-lbl { color: #5d5491; }
+.progress-lbl { color: #51468a; }
 
 /* ---------- Profile ---------- */
 .profile-card {
@@ -175,7 +175,7 @@ body::before {
 }
 .online-pill { background: rgba(16,185,129,.1); border: 1px solid rgba(16,185,129,.32); color: #047857; }
 .pro-pill { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.32); }
-.pill.gold { background: linear-gradient(135deg, rgba(245,158,11,.16), rgba(168,85,247,.16)); border: 1px solid rgba(245,158,11,.45); color: #b45309; }
+.pill.gold { background: linear-gradient(135deg, rgba(146,64,14,.92), rgba(126,34,206,.88)); border: 1px solid rgba(146,64,14,.7); color: #fff; box-shadow: 0 8px 18px -8px rgba(146,64,14,.55); }
 
 /* ---------- อื่นๆ ---------- */
 .welcome-name { color: var(--text); }
