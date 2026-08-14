@@ -439,9 +439,13 @@ function connectWS() {
       const data = JSON.parse(ev.data);
       if (data.type === 'welcome') {
         $('online-count').textContent = data.online;
+        if (data.bot) $('chat-status').textContent = 'เชื่อมต่อแล้ว · สลี๋บอทออนไลน์ 💫';
       } else if (data.type === 'message') {
         renderChatMsg(data.message, false);
-        $('online-count').textContent = (parseInt($('online-count').textContent) || 1) + 0;
+      } else if (data.type === 'bot-typing') {
+        showBotTyping();
+      } else if (data.type === 'bot-done') {
+        hideBotTyping();
       }
     } catch (e) {}
   };
@@ -460,12 +464,30 @@ async function loadChatHistory() {
 
 function renderChatMsg(m, isMe) {
   const area = $('chat-area');
+  hideBotTyping();
+  const isBot = m.userId === 'sali-bot';
   const div = document.createElement('div');
-  div.className = 'msg ' + (isMe ? 'me' : 'ai');
+  div.className = 'msg ' + (isMe ? 'me' : (isBot ? 'bot' : 'ai'));
   const t = new Date(m.time).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
-  div.innerHTML = `<div class="bubble">${escapeHtml(m.text)}</div><div class="meta">${isMe ? 'คุณ' : m.user} · ${t}</div>`;
+  const who = isMe ? 'คุณ' : (isBot ? '💫 ' + m.user : m.user);
+  div.innerHTML = `<div class="bubble">${escapeHtml(m.text)}</div><div class="meta">${who} · ${t}</div>`;
   area.appendChild(div);
   area.scrollTop = area.scrollHeight;
+}
+
+/* ---------- 🤖 สลี๋บอท: indicator กำลังพิมพ์ ---------- */
+function showBotTyping() {
+  const area = $('chat-area');
+  if (document.querySelector('.msg.bot.typing-msg')) return;
+  const div = document.createElement('div');
+  div.className = 'msg bot typing-msg';
+  div.innerHTML = `<div class="bubble typing-bubble"><span></span><span></span><span></span></div><div class="meta">💫 สลี๋บอทกำลังพิมพ์…</div>`;
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+}
+function hideBotTyping() {
+  const el = document.querySelector('.msg.bot.typing-msg');
+  if (el) el.remove();
 }
 
 function sendChat() {

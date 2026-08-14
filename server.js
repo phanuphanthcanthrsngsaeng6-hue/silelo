@@ -261,6 +261,7 @@ function aiMockReply(q) {
   if (t.includes('ฟีเจอร์') || t.includes('แนะนำ')) return '💡 **3 ฟีเจอร์แนะนำถัดไป**\n1. 🤖 แชท AI ตอบลูกค้าอัตโนมัติ (ลด workload 60%)\n2. 🎯 Push notification เฉพาะบุคคล (เพิ่ม Retention +23%)\n3. 🧾 ใบเสร็จดิจิทัล + ระบบสมาชิก (เพิ่มรายได้ประจำ)';
   if (t.includes('สวัสดี') || t.includes('hi') || t.includes('hello')) return 'สวัสดีครับ! 😊 มีอะไรให้ผมช่วยไหมครับ? ลองถามเรื่องสรุปโปรเจกต์ วิเคราะห์ยอดขาย หรือแนะนำฟีเจอร์ได้เลย';
   if (t.includes('ขอบคุณ') || t.includes('thank')) return 'ด้วยความยินดีครับ! 🙌 มีอะไรเพิ่มเติมเรียกใช้ผมได้ตลอดนะครับ';
+  if (t.includes('ประชุม') || t.includes('meeting')) return '📅 ยังไม่มีตารางประชุมลงทะเบียนในระบบครับ ถ้าต้องการนัด ให้บอกวันเวลาได้เลย เดี๋ยวผมช่วยเตือนทีมในแชทได้นัดกัน 📆';
   return 'ขอบคุณสำหรับคำถามครับ 🤖 ผมเข้าใจคำถามว่า: "' + q + '"\n\nในเวอร์ชันเต็ม ระบบนี้เชื่อมต่อกับ AI (เช่น GPT / Gemini) เพื่อตอบคำถามเฉพาะธุรกิจของคุณได้แบบเรียลไทม์ — ตอนนี้เป็นโหมดสาธิตครับ ลองถามผมเรื่อง "สรุปโปรเจกต์" "วิเคราะห์ยอดขาย" หรือ "แนะนำฟีเจอร์" ได้เลยครับ';
 }
 
@@ -641,11 +642,58 @@ app.post('/api/messages', auth, (req, res) => {
   db.messages.push(msg);
   saveDB(db);
   broadcast({ type: 'message', message: msg });
+  maybeBotReply(req.user, msg.text);
   res.json({ ok: true, message: msg });
 });
 
 /* ---- Error handling ---- */
 app.use((req, res) => res.status(404).json({ ok: false, error: 'ไม่พบเส้นทางที่ขอ' }));
+
+/* ================== 🤖 สลี๋บอท ประจำแชททีมงาน ================== */
+const BOT_ID = 'sali-bot';
+const BOT_NAME = 'สลี๋บอท';
+const botCooldown = new Map(); // userId -> last reply time
+
+function shouldBotReply(text) {
+  const t = String(text || '').trim().toLowerCase();
+  if (t.includes('@sali') || t.includes('@bot') || t.includes('@สลี๋')) return true;
+  if (/[?？]$/.test(t)) return true;
+  return /(ไหม|มั้ย|ยังไง|อย่างไร|เท่าไหร่|เท่าไร|กี่บาท|ไหน|ได้ไหม|ช่วย|ช่วยหน่อย|แนะนำ|อธิบาย|สรุป|แจ้ง)/.test(t);
+}
+
+function botCooldownOk(userId) {
+  const last = botCooldown.get(userId) || 0;
+  if (Date.now() - last < 20000) return false;
+  botCooldown.set(userId, Date.now());
+  return true;
+}
+
+async function saliBotReply(user, triggerText) {
+  const history = db.messages.slice(-16).map(m => ({
+    role: m.userId === BOT_ID ? 'assistant' : 'user',
+    content: (m.userId === BOT_ID ? 'สลี๋บอท: ' : (m.user + ': ')) + m.text
+  }));
+  try {
+    broadcast({ type: 'bot-typing' });
+    const result = await askAI(user, triggerText, history);
+    const reply = (result && result.reply) || aiMockReply(triggerText);
+    const msg = { id: crypto.randomUUID(), user: BOT_NAME, userId: BOT_ID, text: String(reply).slice(0, 500), time: Date.now(), bot: true };
+    db.messages.push(msg);
+    saveDB(db);
+    broadcast({ type: 'message', message: msg });
+  } catch (e) {
+    console.error('🤖 สลี๋บอท error:', e.message);
+  } finally {
+    broadcast({ type: 'bot-done' });
+  }
+}
+
+function maybeBotReply(user, text) {
+  if (!user || user.id === BOT_ID) return;
+  if (!shouldBotReply(text)) return;
+  if (!botCooldownOk(user.id)) return;
+  saliBotReply(user, text);
+}
 
 /* ================== HTTP + WEBSOCKET SERVER ================== */
 const server = http.createServer(app);
@@ -659,7 +707,7 @@ function broadcast(data) {
 wss.on('connection', (ws) => {
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
-  ws.send(JSON.stringify({ type: 'welcome', message: 'เชื่อมต่อเรียลไทม์สำเร็จ ✅', online: wss.clients.size }));
+  ws.send(JSON.stringify({ type: 'welcome', message: 'เชื่อมต่อเรียลไทม์สำเร็จ ✅', online: wss.clients.size, bot: true }));
   ws.on('message', (raw) => {
     try {
       const data = JSON.parse(raw);
@@ -673,6 +721,7 @@ wss.on('connection', (ws) => {
           db.messages.push(msg);
           saveDB(db);
           broadcast({ type: 'message', message: msg });
+          maybeBotReply(user, msg.text);
         } catch (e) { /* invalid token */ }
       }
     } catch (e) { /* ignore */ }
