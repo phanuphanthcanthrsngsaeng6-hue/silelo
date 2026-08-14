@@ -1,0 +1,23 @@
+{
+  "name": "silelo-mobile-app",
+  "version": "1.0.0",
+  "description": "Silelo💯✨️ — แอปพลิเคชันมือถือ AI ครบวงจร (สเป็คแพ็กเกจ $12,999)",
+  "main": "server.js",
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "bcryptjs": "^2.4.3",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "msedge-tts": "^2.0.7",
+    "multer": "^2.2.0",
+    "sharp": "^0.35.3",
+    "ws": "^8.17.0"
+  }
+}

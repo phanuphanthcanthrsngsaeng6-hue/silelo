@@ -1,0 +1,37 @@
+# ============================================
+# Silelo 💯✨ — Render Blueprint (deploy อัตโนมัติ)
+# ใช้: render.com → New → Blueprint → เลือก repo นี้
+# ============================================
+services:
+  - type: web
+    name: silelo
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # 🔑 รหัสลับ JWT — Render สุ่มให้อัตโนมัติ
+      - key: JWT_SECRET
+        generateValue: true
+      # 🤖 คีย์ OpenRouter (แชท + สร้างภาพ) — ใส่ตอนกด Deploy
+      - key: OPENROUTER_API_KEY
+        sync: false
+      # 👤 เจ้าของแอป — สลี่รับใช้ได้แค่คนนี้
+      - key: AI_OWNER_EMAIL
+        value: demo@silelo.app
+      # 🐋 DeepSeek (คีย์พี่บอส — ใช้เมื่อเติมเงินแล้ว)
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: DEEPSEEK_MODEL
+        value: deepseek-v4-flash
+      # 🎤 เสียงสลี่ (ฟรี ไม่ต้องคีย์)
+      - key: TTS_VOICE
+        value: th-TH-PremwadeeNeural
+      # 🎧 Whisper STT — สมัครคีย์ฟรีที่ console.groq.com
+      - key: GROQ_API_KEY
+        sync: false
+      # 🎨 โมเดลสร้างภาพสำรอง
+      - key: OPENROUTER_IMAGE_MODEL
+        value: google/gemini-2.5-flash-image

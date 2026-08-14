@@ -1,0 +1,149 @@
+{
+  "users": [
+    {
+      "id": "u_demo",
+      "name": "Bossnu",
+      "email": "demo@silelo.app",
+      "password": "$2a$10$Ds7FPzEMKN2.bX1WJxaEm.kOleXpCVEOHMhfD4vPSfUcVJqU4ZPLi",
+      "role": "owner",
+      "country": "Thailand",
+      "plan": "Unlimited",
+      "vip": true,
+      "milestonesPaid": [
+        1,
+        2,
+        3
+      ],
+      "createdAt": "2026-08-14T09:17:26.097Z",
+      "unlimited": true
+    },
+    {
+      "id": "u_411de3a95f3f",
+      "name": "แขก",
+      "email": "guest@test.com",
+      "password": "$2a$10$v4aEP4zTyrfdms5bOBjnEeG6WkxS7sXwketHC6DtWp5CxALF.ak52",
+      "role": "client",
+      "country": "Thailand",
+      "plan": "Professional",
+      "milestonesPaid": [],
+      "createdAt": "2026-08-14T11:15:06.009Z"
+    },
+    {
+      "id": "u_b6aef81733cb",
+      "name": "Guest",
+      "email": "guest2@test.com",
+      "password": "$2a$10$.ISro3bt.nodRIiJR2te9OTgIt29k5/MxSom04K0GSUczWHVqc4Iy",
+      "role": "client",
+      "country": "Thailand",
+      "plan": "Professional",
+      "milestonesPaid": [],
+      "createdAt": "2026-08-14T13:04:32.718Z"
+    }
+  ],
+  "messages": [
+    {
+      "id": "7387698b-3084-4236-b9e3-b2228523a65a",
+      "user": "Silelo Support",
+      "text": "สวัสดีครับ 👋 ยินดีต้อนรับสู่ Silelo! 💯✨️ สอบถามอะไรได้เลยนะครับ",
+      "time": 1786526246097
+    },
+    {
+      "id": "f6726c97-108c-4880-87ed-1761dbf710cb",
+      "user": "Silelo Support",
+      "text": "โปรเจกต์ของคุณอยู่ในขั้นตอนการออกแบบ UX/UI แล้ว 🎨",
+      "time": 1786612646097
+    },
+    {
+      "id": "ab5ea67c-47b5-4960-b7d8-5ead4e0c97f5",
+      "user": "Bossnu",
+      "userId": "u_demo",
+      "text": "ดี",
+      "time": 1786699580676
+    },
+    {
+      "id": "9e83560a-0c6d-431f-a4ac-9421bbb38f37",
+      "user": "Bossnu",
+      "userId": "u_demo",
+      "text": "สวัสดีครับ ทีมงาน",
+      "time": 1786702112268
+    },
+    {
+      "id": "5600d419-6bef-4001-be7a-b52d715d2135",
+      "user": "Bossnu",
+      "userId": "u_demo",
+      "text": "ทีมงาน",
+      "time": 1786712065482
+    }
+  ],
+  "transactions": [
+    {
+      "id": "b70d04f0-aa4a-4289-9733-a7c6fae2b87d",
+      "userId": "u_demo",
+      "milestoneId": 1,
+      "title": "Kickoff Payment",
+      "amount": 3900,
+      "method": "PromptPay",
+      "status": "completed",
+      "time": 1786267046097
+    },
+    {
+      "id": "a1435732-df21-498d-b7cf-677a0594be5f",
+      "userId": "u_demo",
+      "milestoneId": 2,
+      "title": "Finish UX/UI Design",
+      "amount": 5200,
+      "method": "Visa •••• 4242",
+      "status": "completed",
+      "time": 1786526246097
+    },
+    {
+      "id": "f637c044-3332-4721-a867-a702cc0bd8ca",
+      "userId": "u_demo",
+      "milestoneId": 3,
+      "title": "Final Delivery",
+      "amount": 3899,
+      "method": "Visa •••• 4242",
+      "status": "completed",
+      "time": 1786612646097
+    }
+  ],
+  "memories": {
+    "u_demo": [
+      {
+        "fact": "พี่นุชอบกินข้าวมันไก่ และวันเกิดพี่นุวันที่ 15 มิถุนายน",
+        "at": "2026-08-14T13:01:03.397Z"
+      }
+    ]
+  },
+  "package": {
+    "name": "การพัฒนาแอปพลิเคชันมือถือ AI ครบวงจร",
+    "price": 12999,
+    "currency": "USD",
+    "durationWeeks": 8,
+    "concepts": 1,
+    "revisions": 4,
+    "milestones": [
+      {
+        "id": 1,
+        "title": "Kickoff Payment",
+        "subtitle": "จ่ายเมื่อเริ่มงาน · Due at checkout",
+        "amount": 3900,
+        "status": "paid"
+      },
+      {
+        "id": 2,
+        "title": "Finish UX/UI Design",
+        "subtitle": "เมื่อเสร็จสิ้นการออกแบบ UX/UI",
+        "amount": 5200,
+        "status": "paid"
+      },
+      {
+        "id": 3,
+        "title": "Final Delivery",
+        "subtitle": "เมื่อส่งมอบงานครบสมบูรณ์",
+        "amount": 3899,
+        "status": "paid"
+      }
+    ]
+  }
+}

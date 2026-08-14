@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#070a18">
+<meta name="description" content="Silelo💯✨️ — แอปพลิเคชันมือถือ AI ครบวงจร: AI Assistant, แชทเรียลไทม์, แผนที่, ชำระเงิน และ Analytics">
+<title>Silelo💯✨️</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="/style.css?v=7">
+</head>
+<body>
+
+<!-- ============ AUTH SCREEN ============ -->
+<div id="auth-screen" class="auth-screen">
+  <div class="auth-glow"></div>
+  <div class="auth-box">
+    <div class="auth-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h3l2.5-6L13 18l2.5-6H21"/></svg>
+    </div>
+    <h1>Silelo<span>💯✨️</span></h1>
+    <p class="auth-sub">แอปพลิเคชันมือถือ AI — ออกแบบและพัฒนาโดย Silelo</p>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-auth="login" onclick="switchAuth('login')">เข้าสู่ระบบ</button>
+      <button class="auth-tab" data-auth="register" onclick="switchAuth('register')">สมัครสมาชิก</button>
+    </div>
+
+    <form id="auth-form" onsubmit="return handleAuth(event)">
+      <label class="field" id="field-name" style="display:none">
+        <span>ชื่อ-นามสกุล</span>
+        <input type="text" id="in-name" placeholder="เช่น Bossnu" autocomplete="name">
+      </label>
+      <label class="field">
+        <span>อีเมล</span>
+        <input type="email" id="in-email" placeholder="you@example.com" autocomplete="email" required>
+      </label>
+      <label class="field">
+        <span>รหัสผ่าน</span>
+        <input type="password" id="in-pass" placeholder="••••••••" autocomplete="current-password" required>
+      </label>
+      <button type="submit" class="btn-primary btn-block" id="auth-submit">เข้าสู่ระบบ 🚀</button>
+    </form>
+
+    <button class="btn-demo" onclick="demoLogin()">✨ เข้าสู่ระบบด้วยบัญชีทดลอง (demo@silelo.app)</button>
+    <p class="auth-error" id="auth-error"></p>
+  </div>
+</div>
+
+<!-- ============ APP SHELL ============ -->
+<div id="app" class="app" style="display:none">
+  <header class="app-header">
+    <div class="h-left">
+      <div class="h-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h3l2.5-6L13 18l2.5-6H21"/></svg>
+      </div>
+      <div>
+        <div class="h-title">Silelo<span>💯✨️</span></div>
+        <div class="h-sub" id="h-sub">พร้อมใช้งาน</div>
+      </div>
+    </div>
+    <div class="h-right">
+      <button class="icon-btn" onclick="go('me')" aria-label="โปรไฟล์">
+        <div class="mini-avatar" id="h-avatar">K</div>
+      </button>
+    </div>
+  </header>
+
+  <main id="main" class="main">
+    <!-- HOME -->
+    <section class="screen" id="screen-home">
+      <div class="welcome-row">
+        <div>
+          <div class="welcome-hi">สวัสดีครับ 👋</div>
+          <div class="welcome-name" id="welcome-name">Bossnu</div>
+        </div>
+        <span class="pill online-pill"><span class="dot"></span>ออนไลน์</span>
+      </div>
+
+      <div class="hero-card">
+        <div class="hero-card-top">
+          <span class="pill glass">🤖 AI Assistant</span>
+          <span class="pill glass gold">👑 ULTIMATE</span>
+        </div>
+        <h2>ยินดีต้อนรับสู่<br>แอปของคุณ 🚀</h2>
+        <p>โปรเจกต์ของคุณอยู่ในขั้นตอนที่ 2 — การออกแบบ UX/UI เสร็จแล้ว กำลังพัฒนาแอปด้วย Flutter</p>
+        <div class="progress"><div class="progress-bar" style="width:62%"></div></div>
+        <div class="progress-lbl"><span>ความคืบหน้า 62%</span><span>สัปดาห์ที่ 5 / 8</span></div>
+      </div>
+
+      <h3 class="sec-title">📊 ภาพรวม</h3>
+      <div class="stat-grid">
+        <div class="stat-card" onclick="go('me', 'analytics')">
+          <div class="stat-ic blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+          <div class="stat-num" id="stat-users">24.8k</div>
+          <div class="stat-lbl">ผู้ใช้รายเดือน</div>
+          <div class="stat-up">▲ 18.4%</div>
+        </div>
+        <div class="stat-card" onclick="go('me', 'analytics')">
+          <div class="stat-ic green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg></div>
+          <div class="stat-num" id="stat-revenue">$42.8k</div>
+          <div class="stat-lbl">รายได้รวม</div>
+          <div class="stat-up">▲ 24.5%</div>
+        </div>
+        <div class="stat-card" onclick="go('me', 'payments')">
+          <div class="stat-ic violet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></div>
+          <div class="stat-num" id="stat-paid">$9.1k</div>
+          <div class="stat-lbl">ชำระแล้ว</div>
+          <div class="stat-up" id="stat-paid-up">3 / 3 งวด</div>
+        </div>
+      </div>
+
+      <h3 class="sec-title">📈 รายได้ 7 เดือน</h3>
+      <div class="card chart-card"><canvas id="chart-revenue" height="150"></canvas></div>
+
+      <h3 class="sec-title">⚡ ทางลัด</h3>
+      <div class="quick-grid">
+        <button class="quick" onclick="go('me','payments')"><span class="q-ic gold">💰</span><span>ชำระเงิน<br><small>3 งวด</small></span></button>
+        <button class="quick" onclick="go('ai')"><span class="q-ic cyan">🤖</span><span>ถาม AI<br><small>Assistant</small></span></button>
+        <button class="quick" onclick="go('chat')"><span class="q-ic green">💬</span><span>แชท<br><small>Real-time</small></span></button>
+        <button class="quick" onclick="go('map')"><span class="q-ic violet">📍</span><span>แผนที่<br><small>สำนักงาน</small></span></button>
+      </div>
+
+      <h3 class="sec-title">🧾 ธุรกรรมล่าสุด</h3>
+      <div class="card tx-list" id="tx-list"><div class="skeleton"></div><div class="skeleton"></div></div>
+    </section>
+
+    <!-- AI ASSISTANT -->
+    <section class="screen chat-screen" id="screen-ai">
+      <div class="screen-head">
+        <div class="screen-avatar ai">🤖</div>
+        <div>
+          <h2>Silelo AI</h2>
+          <p>ผู้ช่วยอัจฉริยะของแอปคุณ · ออนไลน์</p>
+        </div>
+      </div>
+      <div class="ai-mode-toggle" id="ai-mode-toggle">
+        <button class="mode-btn active" data-mode="chat" onclick="setAIMode('chat')">💬 แชท</button>
+        <button class="mode-btn" data-mode="image" onclick="setAIMode('image')">🎨 สร้างภาพ</button>
+      </div>
+      <div class="chat-area" id="ai-chat">
+        <div class="msg ai"><div class="bubble">สวัสดีครับ! ผมคือ Silelo AI 🤖 ผู้ช่วยส่วนตัวของคุณ ผมช่วยได้ทั้งแนะนำฟีเจอร์ วิเคราะห์ข้อมูล หรือตอบคำถามเกี่ยวกับโปรเจกต์ของคุณ ลองพิมพ์ข้อความหรือกดคำถามด้านล่างได้เลยครับ</div></div>
+      </div>
+      <div class="suggest-row" id="ai-suggest">
+        <button class="suggest" data-q="สรุปโปรเจกต์ของฉัน">📋 สรุปโปรเจกต์</button>
+        <button class="suggest" data-q="วิเคราะห์ยอดขายเดือนนี้">📊 วิเคราะห์ยอดขาย</button>
+        <button class="suggest" data-q="แนะนำฟีเจอร์ใหม่">💡 แนะนำฟีเจอร์</button>
+      </div>
+      <div class="input-bar">
+        <input id="ai-input" placeholder="พิมพ์ข้อความ..." onkeydown="if(event.key==='Enter')aiSend()">
+        <button class="mic-btn" id="ai-mic" aria-label="พูดกับสลี่" onmousedown="pttStart(event)" onmouseup="pttEnd(event)" onmouseleave="pttEnd(event)" ontouchstart="pttStart(event)" ontouchend="pttEnd(event)">🎤</button>
+        <button class="send-btn" onclick="aiSend()" aria-label="ส่ง"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></button>
+      </div>
+    </section>
+
+
+    <!-- VOICE CALL (ระบบโทรคุยเสียงสลี่) -->
+    <section class="screen chat-screen" id="screen-voice">
+      <div class="screen-head">
+        <div class="screen-avatar ai voice-pulse">📞</div>
+        <div>
+          <h2>สลี่ออลา</h2>
+          <p id="voice-status">กดปุ่มเพื่อคุยกับสลี่</p>
+        </div>
+      </div>
+      <div class="voice-stage">
+        <div class="voice-orb" id="voice-orb">
+          <div class="voice-orb-inner">💗</div>
+        </div>
+        <div class="voice-wave" id="voice-wave"></div>
+        <p class="voice-hint" id="voice-hint">กดค้าง 🎤 เพื่อพูด · กด 📞 เพื่อโหมดคุยต่อเนื่อง</p>
+        <div class="voice-last" id="voice-last"></div>
+      </div>
+      <div class="voice-controls">
+        <button class="voice-btn" id="btn-ptt" aria-label="กดค้างเพื่อพูด">🎤 <small>กดค้างพูด</small></button>
+        <button class="voice-btn call" id="btn-callmode" aria-label="โหมดคุยต่อเนื่อง">📞 <small>คุยต่อเนื่อง</small></button>
+      </div>
+      <div class="voice-memories" id="voice-memories" style="display:none">
+        <h4>💍 ความทรงจำที่สลี่จำได้</h4>
+        <div id="voice-mem-list"></div>
+      </div>
+    </section>
+
+    <!-- CHAT -->
+    <section class="screen chat-screen" id="screen-chat">
+      <div class="screen-head">
+        <div class="screen-avatar chat">💬</div>
+        <div>
+          <h2>แชททีมงาน</h2>
+          <p id="chat-status">กำลังเชื่อมต่อ...</p>
+        </div>
+        <span class="pill online-pill"><span class="dot"></span><span id="online-count">1</span></span>
+      </div>
+      <div class="chat-area" id="chat-area">
+        <div class="chat-date">— เริ่มแชท —</div>
+      </div>
+      <div class="input-bar">
+        <input id="chat-input" placeholder="พิมพ์ข้อความ..." onkeydown="if(event.key==='Enter')sendChat()">
+        <button class="send-btn" onclick="sendChat()" aria-label="ส่ง"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></button>
+      </div>
+    </section>
+
+    <!-- MAP -->
+    <section class="screen" id="screen-map">
+      <div class="screen-head">
+        <div class="screen-avatar map">📍</div>
+        <div>
+          <h2>แผนที่</h2>
+          <p>สำนักงาน Silelo · Dhaka, Bangladesh</p>
+        </div>
+      </div>
+      <div class="card map-card">
+        <div id="map"></div>
+        <div class="map-info">
+          <div class="map-pin">🏢</div>
+          <div>
+            <b>Silelo HQ</b>
+            <span>Gulshan Avenue, Dhaka · ตอบกลับใน ~2 ชม.</span>
+          </div>
+        </div>
+      </div>
+      <h3 class="sec-title">📍 สาขาและพันธมิตร</h3>
+      <div class="card place-list" id="place-list">
+        <div class="place"><span class="place-ic">🏢</span><div><b>สำนักงานใหญ่ — Dhaka</b><small>Silelo HQ · Gulshan</small></div></div>
+        <div class="place"><span class="place-ic">🤝</span><div><b>พันธมิตร — Bangkok</b><small>ทีมพัฒนา Flutter · สยาม</small></div></div>
+        <div class="place"><span class="place-ic">☁️</span><div><b>เซิร์ฟเวอร์ — Singapore</b><small>Firebase / Node.js cluster</small></div></div>
+      </div>
+    </section>
+
+    <!-- ME / PROFILE -->
+    <section class="screen" id="screen-me">
+      <div class="profile-card">
+        <div class="profile-avatar" id="profile-avatar">K</div>
+        <h2 id="profile-name">Bossnu</h2>
+        <p id="profile-email">demo@silelo.app</p>
+        <div class="profile-badges">
+          <span class="pill pro-pill">👑 บัญชีหลัก · ไร้ขีดจำกัด</span>
+          <span class="pill glass gold" id="profile-plan">Plan: Unlimited ∞</span>
+        </div>
+      </div>
+
+      <div class="menu-list" id="menu-list">
+        <button class="menu-item" onclick="showSub('payments')">
+          <span class="mi-ic gold">💰</span><span class="mi-txt"><b>การชำระเงิน &amp; แพ็กเกจ</b><small>3 งวด · $12,999</small></span><span class="mi-arrow">›</span>
+        </button>
+        <button class="menu-item" onclick="showSub('analytics')">
+          <span class="mi-ic cyan">📊</span><span class="mi-txt"><b>การวิเคราะห์ข้อมูล</b><small>พฤติกรรมผู้ใช้ · Retention</small></span><span class="mi-arrow">›</span>
+        </button>
+        <button class="menu-item" onclick="showSub('settings')">
+          <span class="mi-ic violet">⚙️</span><span class="mi-txt"><b>ตั้งค่า</b><small>โปรไฟล์ · การแจ้งเตือน</small></span><span class="mi-arrow">›</span>
+        </button>
+        <button class="menu-item" onclick="showSub('about')">
+          <span class="mi-ic blue">ℹ️</span><span class="mi-txt"><b>เกี่ยวกับ Silelo</b><small>ทีมออกแบบ · PRO</small></span><span class="mi-arrow">›</span>
+        </button>
+        <button class="menu-item danger" onclick="logout()">
+          <span class="mi-ic red">🚪</span><span class="mi-txt"><b>ออกจากระบบ</b></span><span class="mi-arrow">›</span>
+        </button>
+      </div>
+
+      <!-- Sub screens -->
+      <div id="sub-payments" class="sub-screen">
+        <button class="back-btn" onclick="showSub(null)">← กลับ</button>
+        <h3 class="sec-title">💰 แพ็กเกจของคุณ</h3>
+        <div class="card pkg-card">
+          <div class="pkg-badge">⭐ แพ็กเกจยอดนิยม</div>
+          <h4 id="pkg-name">การพัฒนาแอปพลิเคชันมือถือ AI</h4>
+          <div class="pkg-price" id="pkg-price">$12,999</div>
+          <div class="pkg-meta">
+            <span class="pill glass">⏱ 8 สัปดาห์</span>
+            <span class="pill glass">🎨 1 คอนเซ็ปต์</span>
+            <span class="pill glass">🔄 4 รอบแก้ไข</span>
+          </div>
+        </div>
+        <div class="card vip-banner" id="vip-banner" style="display:none">🎉 <span><b>บัญชีหลัก Silelo ∞</b> — ทุกฟีเจอร์ปลดล็อก 100% ไร้ขีดจำกัด</span></div>
+        <div class="milestones" id="milestones"></div>
+        <div class="card tx-full" id="tx-full"><h4 style="margin-bottom:10px">🧾 ประวัติการชำระ</h4><div id="tx-full-list"></div></div>
+      </div>
+
+      <div id="sub-analytics" class="sub-screen">
+        <button class="back-btn" onclick="showSub(null)">← กลับ</button>
+        <h3 class="sec-title">📊 การวิเคราะห์ข้อมูล</h3>
+        <div class="card chart-card"><canvas id="chart-users" height="150"></canvas></div>
+        <div class="card chart-card"><canvas id="chart-retention" height="150"></canvas></div>
+        <div class="card insight-card">
+          <b>💡 Insight จากระบบ</b>
+          <p>ผู้ใช้ที่เปิดใช้ฟีเจอร์ AI Assistant มีอัตราการคงอยู่ (Retention) สูงขึ้น <b>+23%</b> แนะนำเพิ่มฟีเจอร์แนะนำสินค้าอัตโนมัติในเดือนหน้า</p>
+        </div>
+      </div>
+
+      <div id="sub-settings" class="sub-screen">
+        <button class="back-btn" onclick="showSub(null)">← กลับ</button>
+        <h3 class="sec-title">⚙️ ตั้งค่า</h3>
+        <div class="card settings-card">
+          <label class="field"><span>ชื่อ-นามสกุล</span><input type="text" id="set-name" placeholder="ชื่อของคุณ"></label>
+          <label class="field"><span>อีเมล</span><input type="email" id="set-email" placeholder="you@example.com"></label>
+          <button class="btn-primary btn-block" onclick="saveSettings()">บันทึกการตั้งค่า</button>
+        </div>
+        <div class="card settings-card">
+          <div class="toggle-row"><span>🔔 การแจ้งเตือน push</span><label class="switch"><input type="checkbox" id="set-notify" checked><span class="slider"></span></label></div>
+          <div class="toggle-row"><span>🌙 โหมดมืด</span><label class="switch"><input type="checkbox" id="set-dark" checked><span class="slider"></span></label></div>
+        </div>
+      </div>
+
+      <div id="sub-about" class="sub-screen">
+        <button class="back-btn" onclick="showSub(null)">← กลับ</button>
+        <div class="card about-card">
+          <div class="about-logo">🪁</div>
+          <h3>Silelo💯✨️</h3>
+          <p class="about-role">การออกแบบว่าว · PRO · 2 โปรเจกต์สำเร็จ</p>
+          <p>ทีมออกแบบและพัฒนาแอปพลิเคชันมือถือระดับมืออาชีพจาก Dhaka, Bangladesh — เราสร้างสรรค์แอปที่สวยงาม ใช้งานง่าย และมอบมูลค่าที่แท้จริงให้ธุรกิจของคุณ</p>
+          <div class="about-stats">
+            <div><b>2</b><span>โปรเจกต์</span></div>
+            <div><b>7</b><span>บริการ</span></div>
+            <div><b>~2h</b><span>ตอบกลับ</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Bottom nav -->
+  <nav class="tabbar" id="tabbar">
+    <button class="tab active" data-tab="home" onclick="go('home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span>หน้าแรก</span></button>
+    <button class="tab" data-tab="ai" onclick="go('ai')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect x="4" y="8" width="16" height="12" rx="2"/><path d="M2 14h2M20 14h2M15 13v2M9 13v2"/></svg><span>AI</span></button>
+    <button class="tab" data-tab="chat" onclick="go('chat')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span>แชท</span></button>
+    <button class="tab call-tab" data-tab="voice" onclick="go('voice')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg><span>โทร</span></button>
+    <button class="tab" data-tab="map" onclick="go('map')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg><span>แผนที่</span></button>
+    <button class="tab" data-tab="me" onclick="go('me')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>โปรไฟล์</span></button>
+  </nav>
+</div>
+
+<!-- ============ PAYMENT MODAL ============ -->
+<div id="pay-modal" class="modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="pay-title">ชำระเงินงวดที่ 1</h3>
+      <button class="modal-close" onclick="closeModal('pay-modal')" aria-label="ปิด">✕</button>
+    </div>
+    <div class="pay-amount" id="pay-amount">$3,900</div>
+    <p class="pay-sub">เลือกวิธีการชำระเงิน</p>
+    <div class="pay-methods">
+      <button class="pay-method active" data-method="card" onclick="selectMethod(this)">
+        <span class="pm-ic">💳</span><span><b>บัตรเครดิต</b><small>Visa · Mastercard</small></span>
+      </button>
+      <button class="pay-method" data-method="promptpay" onclick="selectMethod(this)">
+        <span class="pm-ic">📱</span><span><b>PromptPay</b><small>ชำระผ่าน QR</small></span>
+      </button>
+    </div>
+    <div id="card-fields">
+      <label class="field"><span>หมายเลขบัตร</span><input id="pay-card" inputmode="numeric" placeholder="4242 4242 4242 4242" maxlength="19"></label>
+      <div class="two-col">
+        <label class="field"><span>หมดอายุ</span><input id="pay-exp" placeholder="12/28" maxlength="5"></label>
+        <label class="field"><span>CVV</span><input id="pay-cvv" inputmode="numeric" placeholder="123" maxlength="3"></label>
+      </div>
+    </div>
+    <div id="qr-box" style="display:none" class="qr-box">
+      <div class="qr-code">🪁</div>
+      <small>สแกน QR เพื่อชำระเงินผ่าน PromptPay</small>
+    </div>
+    <button class="btn-primary btn-block" id="pay-btn" onclick="confirmPay()">ยืนยันการชำระเงิน</button>
+    <p class="pay-note">🔒 การชำระเงินนี้เป็นการจำลอง (Sandbox) เพื่อสาธิตฟีเจอร์</p>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="/app.js?v=7"></script>
+</body>
+</html>
