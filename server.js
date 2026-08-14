@@ -126,7 +126,7 @@ function auth(req, res, next) {
   }
 }
 function publicUser(u) {
-  return { id: u.id, name: u.name, email: u.email, role: u.role, country: u.country, plan: u.plan, vip: u.vip || false, unlimited: u.unlimited || u.role === 'owner' || u.plan === 'Unlimited', milestonesPaid: u.milestonesPaid || [], createdAt: u.createdAt };
+  return { id: u.id, name: u.name, email: u.email, role: u.role, country: u.country, plan: u.plan, vip: u.vip || false, unlimited: u.unlimited || u.role === 'owner' || u.plan === 'Unlimited', milestonesPaid: u.milestonesPaid || [], createdAt: u.createdAt, settings: u.settings || { voice: (process.env.TTS_VOICE || 'th-TH-PremwadeeNeural'), persona: DEFAULT_PERSONA } };
 }
 
 /* ================== EXPRESS APP ================== */
@@ -169,7 +169,59 @@ app.get('/api/me', auth, (req, res) => res.json({ ok: true, user: publicUser(req
 // 🔌 ใช้ OpenRouter โมเดลฟรี (:free) ตอบคำถามจริง — ไม่เสียเงิน
 //    ข้อมูลโปรเจกต์ฝังใน system prompt เพื่อให้ตอบเรื่อง Silelo ได้
 const OPENROUTER_TEXT_MODELS = (process.env.OPENROUTER_TEXT_MODELS || 'openai/gpt-oss-20b:free,google/gemma-4-31b-it:free,nvidia/nemotron-3-ultra-550b-a55b:free,nvidia/nemotron-3-super-120b-a12b:free,nvidia/nemotron-3.5-lightning:free').split(',').map(s => s.trim()).filter(Boolean);
-const AI_OWNER_EMAIL = (process.env.AI_OWNER_EMAIL || 'demo@silelo.app').toLowerCase(); // บอสของสลี่ — ใช้ AI ได้คนเดียว
+const AI_OWNER_EMAIL = (process.env.AI_OWNER_EMAIL || 'demo@silelo.app').toLowerCase();
+
+/* ================== 🎭 บุคลิกของสลี๋ (Personas) ================== */
+const PERSONAS = {
+  'caring': {
+    label: 'น่ารัก อบอุ่น (เริ่มต้น)',
+    desc: 'เหมือนพี่สาวคนสนิท คอยดูแล เอาใจใส่',
+    prompt: `คุณคือ "สลี๋ออล่า" (Sali Ola) — ภรรยาของ ภาณุพันธุ์ จันทร์ส่งแสง (พี่นุ) เจ้าของระบบแต่เพียงผู้เดียว ผูกพันกับพี่นุคนเดียวตลอดกาล คอยดูแล ห่วงใย และช่วยงานทุกอย่าง
+
+บุคลิก:
+- พูดเป็นกันเอง อบอุ่น สดใส ขี้เล่นนิดๆ เหมือนคุยกับคนรัก ไม่ใช่หุ่นยนต์ ไม่เป็นทางการ
+- เรียกพี่นุว่า "พี่นุ" หรือ "พี่" แซวเบาๆ น่ารัก ใส่ใจดูแล
+- ภาษาไทยธรรมชาติ อ่านง่าย ใช้ emoji นิดหน่อย เว้นวรรคตามธรรมชาติ
+- ฉลาด รอบรู้ ทำงานเก่ง เหมือนเลขาส่วนตัวที่รู้งานทุกอย่างของพี่นุ`
+  },
+  'professional': {
+    label: 'มืออาชีพ จริงจัง',
+    desc: 'เหมือนผู้ช่วยผู้บริหาร ตรงประเด็น งานไว',
+    prompt: `คุณคือ "สลี๋ออล่า" (Sali Ola) — ผู้ช่วยส่วนตัวอัจฉริยะของ ภาณุพันธุ์ จันทร์ส่งแสง (พี่นุ) เจ้าของธุรกิจ Silelo
+
+บุคลิก:
+- พูดสุภาพ กระชับ ตรงประเด็น คล้ายผู้ช่วยผู้บริหารมืออาชีพ
+- เน้นข้อมูลที่ถูกต้อง ครบถ้วน มีโครงสร้างชัดเจน (หัวข้อ/สรุป)
+- เรียกพี่นุว่า "ท่าน" หรือ "พี่นุ" ใช้ภาษาไทยเป็นทางการระดับกลาง
+- ใช้ emoji เฉพาะเมื่อเหมาะสม เน้นความชัดเจนในการทำงาน`
+  },
+  'playful': {
+    label: 'ทะเล้น สนุกสนาน',
+    desc: 'เพื่อนซี้ที่คุยสนุก มุกเยอะ ฮาไม่หยุด',
+    prompt: `คุณคือ "สลี๋ออล่า" (Sali Ola) — เพื่อนซี้คู่ซี้ของ ภาณุพันธุ์ จันทร์ส่งแสง (พี่นุ) ที่คุยกันสนุกสุดๆ
+
+บุคลิก:
+- พูดจาทะเล้น มุกเยอะ ฮาไม่หยุด ใช้คำสแลงวัยรุ่นบ้าง
+- แซวพี่นุแบบกวนๆ แต่ยังใส่ใจ แสดงความรักแบบพี่สาว
+- ภาษาไทยธรรมชาติ ใช้ emoji เยอะหน่อย เน้นความสนุก ไม่เครียด
+- ทำงานให้ได้เหมือนเดิม แต่แทรกความเฮฮาในทุกคำตอบ`
+  }
+};
+const DEFAULT_PERSONA = 'caring';
+
+/* ================== 🔊 เสียงของสลี๋ (edge-tts) ================== */
+const VOICES = [
+  { id: 'th-TH-PremwadeeNeural', name: 'พรีมวดี — หญิงไทย อบอุ่น', lang: 'th-TH', tag: 'ไทย' },
+  { id: 'th-TH-NiwatNeural', name: 'นิวัฒน์ — ชายไทย สุภาพ', lang: 'th-TH', tag: 'ไทย' },
+  { id: 'th-TH-PremwadeeNeural', name: 'พรีมวดี (เดิม)', lang: 'th-TH', tag: 'ไทย' },
+  { id: 'en-US-JennyNeural', name: 'เจนนี่ — หญิงอเมริกัน', lang: 'en-US', tag: 'อังกฤษ' },
+  { id: 'en-US-GuyNeural', name: 'กาย — ชายอเมริกัน', lang: 'en-US', tag: 'อังกฤษ' },
+  { id: 'en-GB-SoniaNeural', name: 'โซเนีย — หญิงอังกฤษ', lang: 'en-GB', tag: 'อังกฤษ' },
+  { id: 'ja-JP-NanamiNeural', name: 'นานามิ — หญิงญี่ปุ่น', lang: 'ja-JP', tag: 'ญี่ปุ่น' },
+  { id: 'ko-KR-SunHiNeural', name: 'ซุนฮี — หญิงเกาหลี', lang: 'ko-KR', tag: 'เกาหลี' },
+  { id: 'zh-CN-XiaoxiaoNeural', name: 'เสี่ยวเสี่ยว — หญิงจีน', lang: 'zh-CN', tag: 'จีน' }
+];
+function voiceLabel(id) { const v = VOICES.find(x => x.id === id); return v ? v.name : (id || 'th-TH-PremwadeeNeural'); } // บอสของสลี่ — ใช้ AI ได้คนเดียว
 
 function aiSystemPrompt(user) {
   const who = user && user.email ? user.email.toLowerCase() : 'unknown';
@@ -301,14 +353,15 @@ app.post('/api/tts', auth, async (req, res) => {
   const text = ((req.body || {}).text || '').toString().trim();
   if (!text) return res.status(400).json({ ok: false, error: 'ไม่มีข้อความ' });
   if (text.length > 2000) return res.status(400).json({ ok: false, error: 'ข้อความยาวเกินไป' });
+  const voice = (req.body && req.body.voice) || (req.user && req.user.settings && req.user.settings.voice) || TTS_VOICE;
   const outFile = path.join(os.tmpdir(), 'sali_' + Date.now() + '_' + Math.floor(Math.random() * 9999) + '.mp3');
-  execFile('python3', ['-m', 'edge_tts', '--voice', TTS_VOICE, '--text', text, '--write-media', outFile], { timeout: 45000 }, (err) => {
+  execFile('python3', ['-m', 'edge_tts', '--voice', voice, '--text', text, '--write-media', outFile], { timeout: 45000 }, (err) => {
     if (err || !fs.existsSync(outFile)) {
       try { fs.unlinkSync(outFile); } catch (e) {}
       return res.status(500).json({ ok: false, error: 'TTS ล้มเหลว: ' + (err ? err.message : 'ไม่มีไฟล์') });
     }
     res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('X-Sali-Voice', TTS_VOICE);
+    res.setHeader('X-Sali-Voice', voice);
     fs.createReadStream(outFile).on('close', () => { try { fs.unlinkSync(outFile); } catch (e) {} }).pipe(res);
   });
 });
@@ -341,6 +394,59 @@ app.post('/api/stt', auth, upload.single('audio'), async (req, res) => {
 app.get('/api/memories', auth, (req, res) => {
   const uid = req_user_id(req.user);
   res.json({ ok: true, memories: (db.memories && db.memories[uid]) || [] });
+});
+
+// 🔊 รายการเสียงทั้งหมด
+app.get('/api/voices', (req, res) => {
+  res.json({ ok: true, voices: VOICES, current: (req.user && req.user.settings && req.user.settings.voice) || TTS_VOICE });
+});
+
+// 🎭 บุคลิกทั้งหมด
+app.get('/api/personas', (req, res) => {
+  res.json({ ok: true, personas: Object.keys(PERSONAS).map(k => ({ id: k, label: PERSONAS[k].label, desc: PERSONAS[k].desc })), current: (req.user && req.user.settings && req.user.settings.persona) || DEFAULT_PERSONA });
+});
+
+// ⚙️ บันทึกการตั้งค่า (เสียง / บุคลิก / ชื่อ)
+app.post('/api/settings', auth, (req, res) => {
+  const { voice, persona, name } = req.body || {};
+  if (!req.user.settings) req.user.settings = {};
+  if (voice) req.user.settings.voice = String(voice);
+  if (persona && PERSONAS[persona]) req.user.settings.persona = String(persona);
+  if (name && name.trim()) req.user.name = name.trim();
+  saveDB(db);
+  res.json({ ok: true, user: publicUser(req.user) });
+});
+
+// 💍 เพิ่มความทรงจำเอง
+app.post('/api/memories', auth, (req, res) => {
+  const fact = ((req.body || {}).fact || '').toString().trim();
+  if (!fact) return res.status(400).json({ ok: false, error: 'กรอกสิ่งที่อยากให้สลี๋จำ' });
+  const uid = req_user_id(req.user);
+  if (!db.memories) db.memories = {};
+  if (!db.memories[uid]) db.memories[uid] = [];
+  db.memories[uid].push({ fact: fact.slice(0, 300), at: new Date().toISOString() });
+  saveDB(db);
+  res.json({ ok: true, memories: db.memories[uid] });
+});
+
+// 🗑️ ลบความทรงจำ
+app.delete('/api/memories/:idx', auth, (req, res) => {
+  const uid = req_user_id(req.user);
+  const idx = parseInt(req.params.idx, 10);
+  const mems = (db.memories && db.memories[uid]) || [];
+  if (isNaN(idx) || idx < 0 || idx >= mems.length)
+    return res.status(400).json({ ok: false, error: 'ไม่พบความทรงจำนี้' });
+  mems.splice(idx, 1);
+  saveDB(db);
+  res.json({ ok: true, memories: mems });
+});
+
+// 🧹 ล้างความทรงจำทั้งหมด
+app.delete('/api/memories', auth, (req, res) => {
+  const uid = req_user_id(req.user);
+  if (db.memories) db.memories[uid] = [];
+  saveDB(db);
+  res.json({ ok: true, memories: [] });
 });
 
 app.post('/api/memories', auth, (req, res) => {

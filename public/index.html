@@ -300,8 +300,32 @@
         <div class="card settings-card">
           <label class="field"><span>ชื่อ-นามสกุล</span><input type="text" id="set-name" placeholder="ชื่อของคุณ"></label>
           <label class="field"><span>อีเมล</span><input type="email" id="set-email" placeholder="you@example.com"></label>
-          <button class="btn-primary btn-block" onclick="saveSettings()">บันทึกการตั้งค่า</button>
         </div>
+
+        <div class="card settings-card">
+          <div class="set-head">🎭 บุคลิกของสลี๋</div>
+          <p class="set-sub">เลือกสไตล์การคุยของสลี๋</p>
+          <div class="persona-grid" id="persona-grid"></div>
+        </div>
+
+        <div class="card settings-card">
+          <div class="set-head">🔊 เสียงของสลี๋</div>
+          <p class="set-sub">เลือกเสียงที่สลี๋ใช้พูด (โหมดโทรศัพท์)</p>
+          <div class="voice-grid" id="voice-grid"></div>
+        </div>
+
+        <div class="card settings-card">
+          <div class="set-head">💍 ความทรงจำของสลี๋</div>
+          <p class="set-sub">สิ่งที่สลี๋จำเกี่ยวกับคุณ — เพิ่ม/ลบได้</p>
+          <div id="mem-list" class="mem-list"></div>
+          <div class="mem-add-row">
+            <input type="text" id="mem-input" placeholder="เช่น พี่นุชอบดื่มกาแฟไม่ใส่น้ำตาล" maxlength="300">
+            <button class="btn-primary" onclick="addMemory()">➕ จำไว้</button>
+          </div>
+          <button class="btn-danger btn-block" id="mem-clear" onclick="clearMemories()" style="display:none">🧹 ล้างความทรงจำทั้งหมด</button>
+        </div>
+
+        <button class="btn-primary btn-block" onclick="saveSettings()">💾 บันทึกการตั้งค่า</button>
         <div class="card settings-card">
           <div class="toggle-row"><span>🔔 การแจ้งเตือน push</span><label class="switch"><input type="checkbox" id="set-notify" checked><span class="slider"></span></label></div>
           <div class="toggle-row"><span>🌙 โหมดมืด</span><label class="switch"><input type="checkbox" id="set-dark" checked><span class="slider"></span></label></div>

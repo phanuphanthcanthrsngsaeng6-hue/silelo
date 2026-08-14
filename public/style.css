@@ -420,3 +420,59 @@ button { cursor:pointer; }
 .mic-btn { width: 42px; height: 42px; border: none; border-radius: 50%; background: #a0215f; color: #fff; font-size: 18px; cursor: pointer; flex-shrink: 0; transition: all .15s; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
 .mic-btn:active { transform: scale(.85); background: #c2185b; }
 .call-tab span { color: #e84393; }
+
+/* ================== 🎭 ตั้งค่า: เสียง / บุคลิก / ความทรงจำ ================== */
+.set-head { font-weight: 700; font-size: .95rem; color: var(--text, #eef1ff); }
+.set-sub { font-size: .75rem; color: var(--muted, #9aa3c7); margin: 2px 0 12px; }
+
+.persona-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.persona-opt {
+  background: rgba(255,255,255,.04); border: 1.5px solid rgba(255,255,255,.09);
+  border-radius: 14px; padding: 10px 12px; text-align: left; cursor: pointer;
+  color: var(--text, #eef1ff); transition: all .2s;
+}
+.persona-opt b { display: block; font-size: .82rem; margin-bottom: 2px; }
+.persona-opt small { display: block; font-size: .68rem; color: var(--muted, #9aa3c7); line-height: 1.35; }
+.persona-opt.on { border-color: #22d3ee; background: rgba(34,211,238,.12); box-shadow: 0 0 0 1px rgba(34,211,238,.4); }
+
+.voice-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.voice-opt {
+  background: rgba(255,255,255,.04); border: 1.5px solid rgba(255,255,255,.09);
+  border-radius: 14px; padding: 10px 12px; text-align: left; cursor: pointer;
+  color: var(--text, #eef1ff); transition: all .2s; position: relative;
+}
+.voice-opt b { display: block; font-size: .8rem; margin-bottom: 2px; }
+.voice-opt small { font-size: .66rem; color: var(--muted, #9aa3c7); }
+.voice-tag {
+  position: absolute; top: 8px; right: 8px; font-size: .6rem; font-weight: 700;
+  background: rgba(99,102,241,.25); color: #c7d2fe; padding: 2px 7px; border-radius: 20px;
+}
+.voice-opt.on { border-color: #22d3ee; background: rgba(34,211,238,.12); box-shadow: 0 0 0 1px rgba(34,211,238,.4); }
+
+.mem-list { display: flex; flex-direction: column; gap: 7px; margin-bottom: 10px; }
+.mem-empty { font-size: .78rem; color: var(--muted, #9aa3c7); padding: 6px 0; }
+.mem-item {
+  display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.07); border-radius: 12px; padding: 8px 10px;
+}
+.mem-ic { font-size: 1rem; }
+.mem-txt { flex: 1; min-width: 0; }
+.mem-txt b { display: block; font-size: .8rem; font-weight: 600; line-height: 1.4; word-break: break-word; }
+.mem-txt small { font-size: .64rem; color: var(--muted, #9aa3c7); }
+.mem-del {
+  width: 26px; height: 26px; border-radius: 50%; border: none; cursor: pointer; flex-shrink: 0;
+  background: rgba(244,63,94,.15); color: #fb7185; font-size: .75rem; font-weight: 700;
+}
+.mem-del:active { transform: scale(.9); }
+.mem-add-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.mem-add-row input {
+  flex: 1; min-width: 0; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.12);
+  border-radius: 12px; color: var(--text, #eef1ff); padding: 10px 12px; font-size: .82rem;
+}
+.btn-danger {
+  background: rgba(244,63,94,.12); color: #fb7185; border: 1px solid rgba(244,63,94,.35);
+  border-radius: 12px; padding: 10px; font-size: .8rem; font-weight: 600; cursor: pointer;
+}
+@media (max-width: 380px) {
+  .persona-grid, .voice-grid { grid-template-columns: 1fr; }
+}

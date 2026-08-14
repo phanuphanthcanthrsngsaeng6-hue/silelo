@@ -149,21 +149,126 @@ function renderProfile() {
   if (vipPill) vipPill.textContent = isUnlimited ? '👑 บัญชีหลัก · ไร้ขีดจำกัด' : '⚡ PRO Client';
 }
 
+/* ================== 🎭 เสียง + บุคลิก + ความทรงจำ ================== */
+let selVoice = '', selPersona = '';
+
 function fillSettings() {
   $('set-name').value = ME.name || '';
   $('set-email').value = ME.email || '';
+  loadVoices();
+  loadPersonas();
+  loadMemList();
+}
+
+async function loadVoices() {
+  try {
+    const d = await api('/api/voices');
+    selVoice = (ME.settings && ME.settings.voice) || d.current || 'th-TH-PremwadeeNeural';
+    const grid = $('voice-grid');
+    grid.innerHTML = d.voices.map(v => `
+      <button class="voice-opt ${v.id === selVoice ? 'on' : ''}" data-voice="${v.id}" onclick="pickVoice('${v.id}')">
+        <span class="voice-tag">${v.tag}</span>
+        <b>${v.name}</b>
+        <small>${v.lang}</small>
+      </button>`).join('');
+  } catch (e) {}
+}
+
+function pickVoice(id) {
+  selVoice = id;
+  document.querySelectorAll('.voice-opt').forEach(b => b.classList.toggle('on', b.dataset.voice === id));
+  toast('เลือกเสียง: ' + (document.querySelector('.voice-opt[data-voice="' + id + '"] b') || {}).textContent);
+}
+
+async function loadPersonas() {
+  try {
+    const d = await api('/api/personas');
+    selPersona = (ME.settings && ME.settings.persona) || d.current || 'caring';
+    const grid = $('persona-grid');
+    grid.innerHTML = d.personas.map(p => `
+      <button class="persona-opt ${p.id === selPersona ? 'on' : ''}" data-persona="${p.id}" onclick="pickPersona('${p.id}')">
+        <b>${p.label}</b>
+        <small>${p.desc}</small>
+      </button>`).join('');
+  } catch (e) {}
+}
+
+function pickPersona(id) {
+  selPersona = id;
+  document.querySelectorAll('.persona-opt').forEach(b => b.classList.toggle('on', b.dataset.persona === id));
+  toast('บุคลิก: ' + (document.querySelector('.persona-opt[data-persona="' + id + '"] b') || {}).textContent);
 }
 
 async function saveSettings() {
   const name = $('set-name').value.trim();
   if (!name) return toast('กรุณากรอกชื่อ');
   try {
-    // จำลองการบันทึก (ในเวอร์ชันจริงจะ PATCH ไปที่ /api/me)
-    ME.name = name;
+    const body = { name };
+    if (selVoice) body.voice = selVoice;
+    if (selPersona) body.persona = selPersona;
+    const d = await api('/api/settings', { method: 'POST', body: JSON.stringify(body) });
+    ME = d.user;
     localStorage.setItem('kt_profile', JSON.stringify(ME));
     renderProfile();
     toast('บันทึกการตั้งค่าแล้ว ✅');
-  } catch (e) { toast('ไม่สามารถบันทึกได้'); }
+  } catch (e) { toast('ไม่สามารถบันทึกได้: ' + e.message); }
+}
+
+/* ---------- 💍 จัดการความทรงจำ ---------- */
+async function loadMemList() {
+  try {
+    const d = await api('/api/memories');
+    const mems = d.memories || [];
+    const list = $('mem-list');
+    if (!mems.length) {
+      list.innerHTML = '<p class="mem-empty">ยังไม่มีความทรงจำ — คุยกับสลี๋แล้วเธอจะจำ หรือพิมพ์เพิ่มเองด้านล่าง ✨</p>';
+      $('mem-clear').style.display = 'none';
+      return;
+    }
+    // แสดงใหม่สุดก่อน
+    list.innerHTML = mems.slice().reverse().map((m, ri) => {
+      const idx = mems.length - 1 - ri;
+      const date = m.at ? new Date(m.at).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }) : '';
+      return `<div class="mem-item">
+        <span class="mem-ic">💍</span>
+        <div class="mem-txt"><b>${escapeHtml(m.fact)}</b><small>${date}</small></div>
+        <button class="mem-del" onclick="delMemory(${idx})" aria-label="ลบ">✕</button>
+      </div>`;
+    }).join('');
+    $('mem-clear').style.display = 'block';
+  } catch (e) {}
+}
+
+async function addMemory() {
+  const inp = $('mem-input');
+  const fact = inp.value.trim();
+  if (!fact) return toast('พิมพ์สิ่งที่อยากให้สลี๋จำก่อน');
+  try {
+    await api('/api/memories', { method: 'POST', body: JSON.stringify({ fact }) });
+    inp.value = '';
+    toast('สลี๋จำได้แล้ว 💍');
+    loadMemList();
+    if (currentTab === 'voice') loadMemories();
+  } catch (e) { toast(e.message); }
+}
+
+async function delMemory(idx) {
+  try {
+    await api('/api/memories/' + idx, { method: 'DELETE' });
+    toast('ลบความทรงจำแล้ว 🗑️');
+    loadMemList();
+    if (currentTab === 'voice') loadMemories();
+  } catch (e) { toast(e.message); }
+}
+
+async function clearMemories() {
+  if (!confirm('ล้างความทรงจำทั้งหมด? สลี๋จะลืมทุกอย่างที่จำได้')) return;
+  try {
+    await api('/api/memories', { method: 'DELETE' });
+    toast('ล้างความทรงจำแล้ว 🧹');
+    loadMemList();
+    if (currentTab === 'voice') loadMemories();
+  } catch (e) { toast(e.message); }
 }
 
 /* ---------- Dashboard ---------- */
@@ -629,10 +734,11 @@ function afterVoiceReply() {
 // —— TTS: ขอเสียงจาก server ——
 async function apiTTS(text) {
   try {
+    const voice = (ME && ME.settings && ME.settings.voice) || selVoice || '';
     const d = await fetch('/api/tts', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('silelo_token') || '') },
-      body: JSON.stringify({ text: String(text).slice(0, 1900) })
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (localStorage.getItem('kt_token') || TOKEN || '') },
+      body: JSON.stringify({ text: String(text).slice(0, 1900), voice })
     });
     if (!d.ok) return null;
     return await d.blob();
