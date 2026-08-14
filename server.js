@@ -377,7 +377,7 @@ async function geminiChat(messages) {
       if (!r.ok) {
         const msg = (j.error && j.error.message) || '';
         const bad = r.status === 401 || r.status === 403 || /quota|permission|invalid|api key|high demand|unavailable/i.test(msg);
-        if (bad) continue; // key นี้ใช้ไม่ได้ → ลอง key ถัดไป
+        if (bad) { console.log('[gemini] key#' + ((start + i) % n + 1) + '/' + n + ' ข้าม: ' + r.status + ' ' + msg.slice(0, 60)); continue; }
         throw new Error('Gemini ' + r.status + ': ' + msg.slice(0, 100));
       }
       const reply = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts && j.candidates[0].content.parts[0] && j.candidates[0].content.parts[0].text;
