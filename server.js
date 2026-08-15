@@ -26,7 +26,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'silelo-secret-2025';
 const DATA_DIR = path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 // 💾 Persistent memory — ความจำของสลี่เก็บบน GitHub Secret Gist (ไม่หายแม้ deploy/restart)
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
+const GITHUB_TOKEN = (process.env.GITHUB_TOKEN || '').replace(/^x-access-token:/, '');
 const GIST_ID = process.env.GIST_ID || '821cfcc8388a154a7a6716dafe129d83';
 
 /* ================== DATA LAYER (JSON Store) ================== */
