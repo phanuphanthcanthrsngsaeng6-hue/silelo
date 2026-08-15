@@ -20,7 +20,10 @@ services:
         sync: false
       # 👤 เจ้าของแอป — สลี่รับใช้ได้แค่คนนี้
       - key: AI_OWNER_EMAIL
-        value: demo@silelo.app
+        value: Phanuphanthcanthrsngsaeng6@gmail.com
+      # 🤖 Gemini — โมเดลหลักของสลี่ (3.6 Flash ล่าสุด — ฉลาด + เร็ว + ประหยัด)
+      - key: GEMINI_MODEL
+        value: gemini-3.6-flash
       # 🐋 DeepSeek (คีย์พี่บอส — ใช้เมื่อเติมเงินแล้ว)
       - key: DEEPSEEK_API_KEY
         sync: false
