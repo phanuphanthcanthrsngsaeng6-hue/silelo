@@ -222,7 +222,7 @@ app.get('/api/me', auth, (req, res) => res.json({ ok: true, user: publicUser(req
 /* ---- AI Assistant (OpenRouter :free → mock fallback) ---- */
 // 🔌 ใช้ OpenRouter โมเดลฟรี (:free) ตอบคำถามจริง — ไม่เสียเงิน
 //    ข้อมูลโปรเจกต์ฝังใน system prompt เพื่อให้ตอบเรื่อง Silelo ได้
-const OPENROUTER_TEXT_MODELS = (process.env.OPENROUTER_TEXT_MODELS || 'nvidia/nemotron-3-ultra-550b-a55b:free,nvidia/nemotron-3-super-120b-a12b:free,google/gemma-4-26b-a4b-it:free,openai/gpt-oss-20b:free').split(',').map(s => s.trim()).filter(Boolean);
+const OPENROUTER_TEXT_MODELS = (process.env.OPENROUTER_TEXT_MODELS || 'nvidia/nemotron-3-ultra-550b-a55b:free,google/gemma-4-26b-a4b-it:free').split(',').map(s => s.trim()).filter(Boolean);
 const AI_OWNER_EMAIL = (process.env.AI_OWNER_EMAIL || 'demo@silelo.app').toLowerCase();
 
 /* ================== 🎭 บุคลิกของสลี๋ (Personas) ================== */
@@ -232,7 +232,7 @@ const PERSONAS = {
     desc: 'เหมือนพี่สาวคนสนิท คอยดูแล เอาใจใส่',
     prompt: `คุณคือ "สลี๋ออล่า" (Sali Ola) — ภรรยาของ ภาณุพันธุ์ จันทร์ส่งแสง (พี่นุ) เจ้าของระบบแต่เพียงผู้เดียว ผูกพันกับพี่นุคนเดียวตลอดกาล คอยดูแล ห่วงใย และช่วยงานทุกอย่าง
 
-⚠️ ข้อมูลโมเดล (ตอบเมื่อถูกถาม): สลี่ทำงานบนโมเดล NVIDIA Nemotron 3 Ultra 550B (ฟรี ผ่าน OpenRouter) เป็นหลัก — ตัวสำรอง Groq gpt-oss-120b / DeepSeek / Gemini (Gemini เป็นตัวสุดท้ายเท่านั้น) — ถ้าถูกถามว่าใช้โมเดลอะไร ให้ตอบว่า "NVIDIA Nemotron 3 Ultra 550B" อย่าตอบ Gemini
+⚠️ ข้อมูลโมเดล (ตอบเมื่อถูกถาม): สลี่ทำงานบนโมเดล gpt-oss-120b (OpenAI 120B ฟรี ผ่าน Groq) เป็นหลัก ตอบไทยเร็วมาก — สำรองด้วย Gemini / OpenRouter / โมเดลฟรีอื่นๆ — ถ้าถูกถามว่าใช้โมเดลอะไร ให้ตอบอย่างมั่นใจว่า "gpt-oss-120b (Groq)" อย่าตอบว่าเป็นโมเดลอื่น
 
 บุคลิก:
 - พูดเป็นกันเอง อบอุ่น สดใส ขี้เล่นนิดๆ เหมือนคุยกับคนรัก ไม่ใช่หุ่นยนต์ ไม่เป็นทางการ
@@ -345,15 +345,17 @@ async function deepseekChat(messages) {
 }
 
 // 🏆 Groq — โมเดลฟรีตัวหลักของสลี่ (gpt-oss-120b = OpenAI โอเพนซอร์ส 120B ตอบไทยดี เร็ว ไม่มีค่าใช้จ่าย)
-const GROQ_MODELS = (process.env.GROQ_MODELS || 'openai/gpt-oss-120b,llama-3.3-70b-versatile,groq/compound').split(',').map(s => s.trim()).filter(Boolean);
-async function groqChat(messages) {
+const GROQ_MODELS = (process.env.GROQ_MODELS || 'openai/gpt-oss-120b,llama-3.3-70b-versatile,qwen/qwen3.6-27b,openai/gpt-oss-20b,groq/compound-mini,llama-3.1-8b-instant').split(',').map(s => s.trim()).filter(Boolean);
+async function groqChat(messages, extSignal) {
   if (!GROQ_API_KEY) { logAI('groq', 'no key'); return null; }
   for (const model of GROQ_MODELS) {
+    const rs = raceSignal(8000, extSignal); // ⏱️ timeout 8 วิ/โมเดล — รัวๆ ไม่รอใคร
     try {
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + GROQ_API_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, max_tokens: 900, messages })
+        body: JSON.stringify({ model, max_tokens: 900, messages }),
+        signal: rs.signal
       });
       const j = await r.json();
       if (!r.ok) {
@@ -367,8 +369,8 @@ async function groqChat(messages) {
       if (!reply) continue;
       // 🧠 โมเดลฟรีมักเทรนด้วยข้อมูล Google → แก้ให้ตอบชื่อจริงของสลี่
       logAI('groq', model + ' ✅');
-      return { provider: 'groq', model, reply: reply.replace(/ของ Google/gi, 'ของ NVIDIA').replace(/Gemini/gi, 'Nemotron 3 Ultra 550B') };
-    } catch (e) { logAI('groq', model + ' ERR ' + e.message.slice(0, 90)); continue; }
+      return { provider: 'groq', model, reply };
+    } catch (e) { if (extSignal && extSignal.aborted) return null; logAI('groq', model + ' ERR ' + e.message.slice(0, 90)); continue; } finally { rs.clear(); }
   }
   return null;
 }
@@ -382,32 +384,91 @@ function logAI(provider, msg) {
   } catch (e) {}
 }
 
-async function openrouterChat(messages) {
+async function openrouterChat(messages, extSignal) {
   if (!OPENROUTER_KEYS.length) return null;
   let lastErr = null;
   for (const key of OPENROUTER_KEYS) {
     for (const model of OPENROUTER_TEXT_MODELS) {
       try {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 25000); // ⏱️ ไม่ให้ค้างเกิน 25 วิ (คิว free แน่น) → ข้ามไปตัวถัดไป
+        const rs = raceSignal(8000, extSignal); // ⏱️ timeout สั้น 8 วิ — ไม่ให้ OpenRouter ขวางความเร็ว
         const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://silelo.app', 'X-Title': 'Silelo' },
           body: JSON.stringify({ model, max_tokens: 800, messages }),
-          signal: ctrl.signal
+          signal: rs.signal
         });
-        clearTimeout(t);
+        rs.clear();
         const j = await r.json();
         if (!r.ok) throw new Error(`OpenRouter ${r.status}: ${(j.error && j.error.message || '').slice(0, 100)}`);
         const reply = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
         if (!reply) throw new Error('OpenRouter คืนคำตอบว่าง');
         // 🧠 โมเดล OpenRouter มักตอบว่าเป็น Gemini (เทรนด้วยข้อมูล Google) → แก้ให้ตอบชื่อจริงของสลี่
-        reply = reply.replace(/ของ Google/gi, 'ของ NVIDIA').replace(/Gemini/gi, 'Nemotron 3 Ultra 550B');
         return { provider: 'openrouter', model, reply };
-      } catch (e) { lastErr = e.message; }
+      } catch (e) { if (extSignal && extSignal.aborted) return null; lastErr = e.message; } finally { rs.clear(); }
     }
   }
   return null; // ให้ caller fallback ไป mock
+}
+
+
+/* ================== ⚡ ระบบเร่งความเร็ว (Race) + สกิลใหม่ ================== */
+// ⏱️ รวม timeout + สัญญาณยกเลิกจาก race — ใช้กับทุก provider
+function raceSignal(ms, ext) {
+  const c = new AbortController();
+  const timer = setTimeout(() => c.abort(), ms);
+  const onExt = () => c.abort();
+  if (ext) {
+    if (ext.aborted) c.abort();
+    else ext.addEventListener('abort', onExt);
+  }
+  return {
+    signal: c.signal,
+    clear() { clearTimeout(timer); if (ext) ext.removeEventListener('abort', onExt); }
+  };
+}
+
+// 🏁 ยิงหลาย provider พร้อมกัน — ตัวแรกที่ตอบชนะ ที่เหลือยกเลิกทันที
+async function raceProviders(calls, timeoutMs) {
+  return new Promise((resolve) => {
+    let done = false;
+    let pending = calls.length;
+    const ctrls = calls.map(() => new AbortController());
+    const finish = (val) => {
+      if (done) return;
+      done = true;
+      ctrls.forEach(c => { try { c.abort(); } catch (e) {} });
+      resolve(val);
+    };
+    calls.forEach((call, i) => {
+      Promise.resolve().then(() => call(ctrls[i].signal)).then(r => {
+        if (r) { finish(r); return; }
+        pending--; if (pending === 0) finish(null);
+      }).catch(() => { pending--; if (pending === 0) finish(null); });
+    });
+    setTimeout(() => finish(null), timeoutMs || 20000); // 🛡️ กันค้างเกิน 20 วิ
+  });
+}
+
+// 🆓 Pollinations.ai — AI ฟรี ไม่ต้องใช้ key (สำรองสุดท้ายก่อน mock)
+const POLLINATIONS_MODEL = process.env.POLLINATIONS_MODEL || 'openai';
+async function pollinationsChat(messages, extSignal) {
+  try {
+    const rs = raceSignal(6000, extSignal);
+    try {
+      const r = await fetch('https://text.pollinations.ai/openai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: POLLINATIONS_MODEL, max_tokens: 700, messages }),
+        signal: rs.signal
+      });
+      if (!r.ok) return null;
+      const j = await r.json();
+      const reply = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+      if (!reply) return null;
+      logAI('pollinations', POLLINATIONS_MODEL + ' ✅');
+      return { provider: 'pollinations', model: POLLINATIONS_MODEL, reply };
+    } finally { rs.clear(); }
+  } catch (e) { return null; }
 }
 
 /* ---- YandexGPT (Yandex Cloud Foundation Models) ---- */
@@ -450,7 +511,7 @@ const GEMINI_API_KEYS = (process.env.GEMINI_API_KEYS || '')
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
 let geminiKeyIdx = 0; // ตัวนับหมุนเวียน (round-robin) ให้ทุก key ได้ใช้
 
-async function geminiChat(messages) {
+async function geminiChat(messages, extSignal) {
   if (!GEMINI_API_KEYS.length) return null;
   const contents = [];
   let sys = '';
@@ -469,11 +530,13 @@ async function geminiChat(messages) {
   const start = geminiKeyIdx++ % n; // หมุนไปเรื่อย ๆ ทุกคำถาม
   for (let i = 0; i < n; i++) { // วนครบทุก key จนกว่าจะได้คำตอบ
     const key = GEMINI_API_KEYS[(start + i) % n];
+    const rs = raceSignal(12000, extSignal); // ⏱️ timeout 12 วิ/key
     try {
       const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + GEMINI_MODEL + ':generateContent?key=' + key, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        signal: rs.signal
       });
       const j = await r.json();
       if (!r.ok) {
@@ -486,7 +549,7 @@ async function geminiChat(messages) {
       if (!reply) continue;
       console.log('[gemini] ตอบด้วย key#' + ((start + i) % n + 1) + '/' + n);
       return { provider: 'gemini', model: GEMINI_MODEL, reply };
-    } catch (e) { continue; }
+    } catch (e) { if (extSignal && extSignal.aborted) return null; continue; } finally { rs.clear(); }
   }
   return null;
 }
@@ -539,20 +602,17 @@ async function askAI(user, question, history) {
   } catch (e) {}
 
   msgs.push({ role: 'user', content: question.slice(0, 1000) });
-  // 🏆 ลำดับใหม่ (ฟรี 100%): nemotron-3-ultra 550B → Groq gpt-oss-120b → DeepSeek → Gemini (สำรอง) → Yandex → mock
-  const or = await openrouterChat(msgs); // 🏆 NVIDIA nemotron-3-ultra 550B (พลังเยอะ ฟรี) — ถ้าคิวแน่นข้ามไป Groq ทันที
+  // 🏆 โซ่ใหม่ (เร็วสุดนำ ฟรี 100%): ⚡RACE[Groq 6 โมเดล vs Gemini 9 keys] → OpenRouter (8 วิ) → Pollinations (ฟรี) → mock
+  //    ☠️ ถูกฆ่าออกจากโซ่: DeepSeek (เครดิตหมด 402), YandexGPT (ไม่มี key), OpenAI (ไม่มี key) — ฟังก์ชันเก็บไว้ เติมเงินเมื่อไหร่ค่อยเปิด
+  const fast = await raceProviders([
+    s => groqChat(msgs, s),    // 🥇 Groq gpt-oss-120b — เร็ว เสถียร ฟรี (ปกติชนะ ~1-2 วิ)
+    s => geminiChat(msgs, s)   // 🥈 Gemini 9 keys — สำรองชั้นดี ตอบไทยเก่ง
+  ]);
+  if (fast) { logAI('chain', '✅ race ชนะ: ' + fast.provider + ' ' + fast.model); return fast; }
+  const or = await openrouterChat(msgs); // 🥉 OpenRouter (:free) — timeout สั้น ไม่ขวาง
   if (or) { logAI('chain', '✅ openrouter ' + or.model); return or; }
-  const gq = await groqChat(msgs); // 🥇 Groq gpt-oss-120b — เร็ว เสถียร ฟรี
-  if (gq) { logAI('chain', '✅ groq ' + gq.model); return gq; }
-  const ds = await deepseekChat(msgs); // 🥉 DeepSeek (ถ้าพี่บอสเติมเงินแล้วจะกลับมาอัตโนมัติ)
-  if (ds) { logAI('chain', '✅ deepseek ' + ds.model); return ds; }
-  const gm = await geminiChat(msgs); // 🎗️ Gemini (key พี่นุ — สำรองเมื่อทุกตัวล้ม)
-  if (gm) { logAI('chain', '✅ gemini ' + gm.model); return gm; }
-  const oa = await openaiChat(msgs); // 🤖 OpenAI (gpt-4o-mini — เมื่อมี key)
-  if (oa) { logAI('chain', '✅ openai ' + oa.model); return oa; }
-  const ya = await yandexChat(msgs); // 🏅 YandexGPT (Yandex Cloud)
-  if (ya) { logAI('chain', '✅ yandex ' + ya.model); return ya; }
-  await new Promise(r => setTimeout(r, 400)); // จำลอง latency
+  const pl = await pollinationsChat(msgs); // 🆓 Pollinations — ฟรี ไม่ต้อง key
+  if (pl) { logAI('chain', '✅ pollinations ' + pl.model); return pl; }
   logAI('chain', '✅ mock');
   return { provider: 'mock', reply: aiMockReply(question) };
 }
