@@ -884,24 +884,44 @@ function lineUser(source) {
   };
 }
 
-// 🎙️ TTS → ไฟล์ mp3 (ใช้ msedge-tts Node ล้วน — ฟรี ไม่ต้อง key) คืน { file, duration(ms) }
+// 🎙️ TTS → ไฟล์เสียง (msedge-tts ฟรี → ffmpeg แปลง m4a/AAC 44.1kHz — LINE เล่นได้ 100%) คืน { file, duration(ms) }
 async function ttsToFile(text, voice) {
   const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
+  const { spawn, spawnSync } = require('child_process');
   const tts = new MsEdgeTTS();
-  await tts.setMetadata(voice || TTS_VOICE, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
-  const outFile = path.join(os.tmpdir(), 'line_sali_' + Date.now() + '_' + Math.floor(Math.random() * 99999) + '.mp3');
+  // 96kbps คุณภาพดีกว่า 48kbps (msedge-tts format 48kHz มีบั๊ก ใช้ไม่ได้)
+  await tts.setMetadata(voice || TTS_VOICE, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
+  const tmpMp3 = path.join(os.tmpdir(), 'line_sali_' + Date.now() + '_' + Math.floor(Math.random() * 99999) + '.mp3');
   await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('tts timeout')), 20000);
     const { audioStream } = tts.toStream(String(text).slice(0, 1900), { rate: 0, pitch: '0Hz', volume: 0 });
-    const ws = fs.createWriteStream(outFile);
+    const ws = fs.createWriteStream(tmpMp3);
     audioStream.on('error', e => { clearTimeout(timer); reject(e); });
     ws.on('error', e => { clearTimeout(timer); reject(e); });
     ws.on('finish', () => { clearTimeout(timer); resolve(); });
     audioStream.pipe(ws);
   });
-  const size = fs.statSync(outFile).size;
-  // msedge-tts = 24kHz 48kbps mono → duration(ms) ≈ bytes*8/48000*1000 = bytes/6
-  return { file: outFile, duration: Math.min(59000, Math.max(1000, Math.round(size / 6))), size };
+  const outFile = tmpMp3.replace(/\.mp3$/, '.m4a');
+  try {
+    // 🎵 แปลง mp3 → m4a (AAC 44.1kHz mono) — LINE รองรับแน่นอน
+    await new Promise((resolve, reject) => {
+      const cp = spawn('ffmpeg', ['-y', '-v', 'error', '-i', tmpMp3, '-c:a', 'aac', '-b:a', '64k', '-ar', '44100', '-ac', '1', outFile]);
+      cp.on('error', () => reject(new Error('no ffmpeg')));
+      cp.on('close', code => code === 0 ? resolve() : reject(new Error('ffmpeg exit ' + code)));
+    });
+    try { fs.unlinkSync(tmpMp3); } catch (e) {}
+    let duration = Math.round(fs.statSync(outFile).size / 12); // fallback อน
+    try {
+      const probe = spawnSync('ffprobe', ['-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', outFile], { timeout: 5000 });
+      const d = parseFloat(String(probe.stdout || '').trim());
+      if (isFinite(d) && d > 0) duration = Math.round(d * 1000);
+    } catch (e) {}
+    return { file: outFile, duration: Math.min(59000, Math.max(1000, duration)), size: fs.statSync(outFile).size };
+  } catch (e) {
+    console.log('[tts] ffmpeg fail (ใช้ mp3 แทน):', e.message);
+    // fallback: mp3 ตามเดิม (96kbps → 12 bytes/ms)
+    return { file: tmpMp3, duration: Math.min(59000, Math.max(1000, Math.round(fs.statSync(tmpMp3).size / 12))), size: fs.statSync(tmpMp3).size };
+  }
 }
 
 // ตอบกลับ LINE ด้วยข้อความ + เสียงพูด (TTS ฟรี) ผ่าน reply API (ต้องภายใน 30 วิ หลังรับ event)
@@ -987,9 +1007,10 @@ app.get('/line-tts/:name', (req, res) => {
   if (!name || !LINE_CHANNEL_SECRET || req.query.k !== LINE_CHANNEL_SECRET) return res.status(403).end();
   const f = path.join(os.tmpdir(), name);
   if (!fs.existsSync(f)) return res.status(404).end();
-  res.setHeader('Content-Type', 'audio/mpeg');
+  res.setHeader('Content-Type', name.endsWith('.m4a') ? 'audio/mp4' : 'audio/mpeg');
   res.setHeader('Cache-Control', 'no-store');
-  fs.createReadStream(f).on('close', () => { try { fs.unlinkSync(f); } catch (e) {} }).pipe(res);
+  // 📆 เก็บไฟล์ 5 นาที กัน LINE ดึงช้า/ดึงซ้ำ (ไม่ลบทันทีหลังเสิร์ฟ)
+  fs.createReadStream(f).on('close', () => { setTimeout(() => { try { fs.unlinkSync(f); } catch (e) {} }, 300000); }).pipe(res);
 });
 
 app.use((req, res) => res.status(404).json({ ok: false, error: 'ไม่พบเส้นทางที่ขอ' }));
