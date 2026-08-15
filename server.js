@@ -867,7 +867,7 @@ const LINE_ACCESS_TOKEN = process.env.LINE_ACCESS_TOKEN || '';
 
 // ผู้ใช้ LINE → pseudo user (สิทธิ์เต็มเหมือนเจ้าของ)
 // 👤 LINE ID ของพี่นุ (เจ้าของ) — สลี่จะรู้ทันทีว่า "พี่นุกำลังคุยอยู่"
-const LINE_OWNER_USER_ID = 'U838cbe52fc78e5d39dca81cc325883f0';
+const LINE_OWNER_USER_ID = 'U4529156e4ce2270579f3b26afb463cdb'; // 🧑 userId จริงของพี่นุ (ก่อนหน้าเป็น userId ของบอทเอง — ผิด!)
 // 🔐 รหัสลับยืนยันตัวตน — พี่นุส่ง "123" หรือ "รหัสลับ123" → สลี่รู้ว่าเป็นพี่นุแน่นอน
 const LINE_SECRET_CODE = (process.env.LINE_SECRET_CODE || '123').trim();
 function lineUser(source) {
