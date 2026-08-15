@@ -884,18 +884,48 @@ function lineUser(source) {
   };
 }
 
-// ตอบกลับ LINE ผ่าน reply API (ต้องภายใน 30 วิ หลังรับ event)
+// 🎙️ TTS → ไฟล์ mp3 (ใช้ msedge-tts Node ล้วน — ฟรี ไม่ต้อง key) คืน { file, duration(ms) }
+async function ttsToFile(text, voice) {
+  const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
+  const tts = new MsEdgeTTS();
+  await tts.setMetadata(voice || TTS_VOICE, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+  const outFile = path.join(os.tmpdir(), 'line_sali_' + Date.now() + '_' + Math.floor(Math.random() * 99999) + '.mp3');
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('tts timeout')), 20000);
+    const { audioStream } = tts.toStream(String(text).slice(0, 1900), { rate: 0, pitch: '0Hz', volume: 0 });
+    const ws = fs.createWriteStream(outFile);
+    audioStream.on('error', e => { clearTimeout(timer); reject(e); });
+    ws.on('error', e => { clearTimeout(timer); reject(e); });
+    ws.on('finish', () => { clearTimeout(timer); resolve(); });
+    audioStream.pipe(ws);
+  });
+  const size = fs.statSync(outFile).size;
+  // msedge-tts = 24kHz 48kbps mono → duration(ms) ≈ bytes*8/48000*1000 = bytes/6
+  return { file: outFile, duration: Math.min(59000, Math.max(1000, Math.round(size / 6))), size };
+}
+
+// ตอบกลับ LINE ด้วยข้อความ + เสียงพูด (TTS ฟรี) ผ่าน reply API (ต้องภายใน 30 วิ หลังรับ event)
 async function lineReply(replyToken, text) {
   if (!LINE_ACCESS_TOKEN) return;
   const msg = String(text || '').slice(0, 4500);
+  const messages = [{ type: 'text', text: msg }];
+  // 🎙️ เพิ่มเสียงพูด (ตัดข้อความสั้น ~350 ตัวอักษร พอฟัง) — ถ้าล้มให้ส่งแค่ข้อความ
+  try {
+    const ttsText = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 250); // เสียง ~45 วิ ไม่เกินขอบจำกัด 60 วิของ LINE
+    if (ttsText) {
+      const { file, duration } = await ttsToFile(ttsText);
+      const base = (process.env.RENDER_EXTERNAL_URL || 'https://silelo.onrender.com').replace(/\/+$/, '');
+      messages.push({ type: 'audio', originalContentUrl: base + '/line-tts/' + encodeURIComponent(path.basename(file)) + '?k=' + encodeURIComponent(LINE_CHANNEL_SECRET), duration });
+    }
+  } catch (e) { console.log('[line] tts fail (ส่งเฉพาะข้อความ):', e.message); }
   try {
     const r = await fetch('https://api.line.me/v2/bot/message/reply', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + LINE_ACCESS_TOKEN, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ replyToken, messages: [{ type: 'text', text: msg }] })
+      body: JSON.stringify({ replyToken, messages })
     });
     if (!r.ok) console.log('[line] reply fail:', r.status, (await r.text()).slice(0, 120));
-    else console.log('[line] ส่งข้อความถึง LINE สำเร็จ');
+    else console.log('[line] ส่งข้อความ+เสียงถึง LINE สำเร็จ (' + messages.length + ' msg)');
   } catch (e) { console.log('[line] reply error:', e.message); }
 }
 
@@ -949,6 +979,17 @@ app.post('/webhook', (req, res) => {
   } catch (e) { console.log('[line] verify error:', e.message); return; }
   const events = (req.body && req.body.events) || [];
   for (const ev of events) handleLineEvent(ev);
+});
+
+// 🎧 เสิร์ฟไฟล์เสียงให้ LINE Server ดึง (ต้องมี ?k= ตรงกับ LINE_CHANNEL_SECRET — ลบไฟล์หลังส่ง)
+app.get('/line-tts/:name', (req, res) => {
+  const name = String(req.params.name || '').replace(/[^a-zA-Z0-9_.-]/g, '');
+  if (!name || !LINE_CHANNEL_SECRET || req.query.k !== LINE_CHANNEL_SECRET) return res.status(403).end();
+  const f = path.join(os.tmpdir(), name);
+  if (!fs.existsSync(f)) return res.status(404).end();
+  res.setHeader('Content-Type', 'audio/mpeg');
+  res.setHeader('Cache-Control', 'no-store');
+  fs.createReadStream(f).on('close', () => { try { fs.unlinkSync(f); } catch (e) {} }).pipe(res);
 });
 
 app.use((req, res) => res.status(404).json({ ok: false, error: 'ไม่พบเส้นทางที่ขอ' }));
