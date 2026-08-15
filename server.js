@@ -371,11 +371,15 @@ async function openrouterChat(messages) {
   for (const key of OPENROUTER_KEYS) {
     for (const model of OPENROUTER_TEXT_MODELS) {
       try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 25000); // ⏱️ ไม่ให้ค้างเกิน 25 วิ (คิว free แน่น) → ข้ามไปตัวถัดไป
         const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://silelo.app', 'X-Title': 'Silelo' },
-          body: JSON.stringify({ model, max_tokens: 800, messages })
+          body: JSON.stringify({ model, max_tokens: 800, messages }),
+          signal: ctrl.signal
         });
+        clearTimeout(t);
         const j = await r.json();
         if (!r.ok) throw new Error(`OpenRouter ${r.status}: ${(j.error && j.error.message || '').slice(0, 100)}`);
         const reply = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
@@ -547,7 +551,7 @@ app.post('/api/ai', auth, async (req, res) => {
 
 /* ================== 🔊 ระบบเสียงสลี่ (Thai-TTS-Silelo-v1 + Whisper) ================== */
 const TTS_VOICE = process.env.TTS_VOICE || 'th-TH-PremwadeeNeural'; // เสียงผู้หญิงไทยอ่อนหวาน (ฟรี ไม่ต้องคีย์)
-const GROQ_API_KEY = process.env.GROQ_API_KEY || ''; // สำหรับ Whisper STT — สมัครฟรีที่ console.groq.com
+const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim(); // สำหรับ Whisper STT — สมัครฟรีที่ console.groq.com
 
 // 🔊 ข้อความ → เสียงสลี่ (msedge-tts Node ล้วน — ไม่ต้องพึ่ง Python; fallback: edge-tts Python)
 app.post('/api/tts', auth, async (req, res) => {
@@ -683,7 +687,7 @@ const IDEOGRAM_API_KEY = process.env.IDEOGRAM_API_KEY || ''; // ใส่คี�
 const IDEOGRAM_MODEL = process.env.IDEOGRAM_MODEL || 'V_2_TURBO';
 const OPENROUTER_KEYS = (process.env.OPENROUTER_API_KEY || '').split(',').map(s => s.trim()).filter(Boolean);
 const OPENROUTER_IMAGE_MODEL = process.env.OPENROUTER_IMAGE_MODEL || 'google/gemini-2.5-flash-image';
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || ''; // คีย์ DeepSeek ของพี่บอส (เติมเงินแล้วใช้ได้ทันที)
+const DEEPSEEK_API_KEY = (process.env.DEEPSEEK_API_KEY || '').trim(); // คีย์ DeepSeek ของพี่บอส (เติมเงินแล้วใช้ได้ทันที)
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash'; // 🔥 V4 Flash ใหม่ล่าสุด (ถูกกว่า V3 อีก) — ใช้ได้กับคีย์พี่บอส
 
 const RATIO_MAP = { '1:1': 'ASPECT_1_1', '16:9': 'ASPECT_16_9', '9:16': 'ASPECT_10_16', '4:3': 'ASPECT_4_3', '3:4': 'ASPECT_3_4' };
