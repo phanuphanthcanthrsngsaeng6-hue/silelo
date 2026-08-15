@@ -218,7 +218,7 @@ app.get('/api/me', auth, (req, res) => res.json({ ok: true, user: publicUser(req
 /* ---- AI Assistant (OpenRouter :free → mock fallback) ---- */
 // 🔌 ใช้ OpenRouter โมเดลฟรี (:free) ตอบคำถามจริง — ไม่เสียเงิน
 //    ข้อมูลโปรเจกต์ฝังใน system prompt เพื่อให้ตอบเรื่อง Silelo ได้
-const OPENROUTER_TEXT_MODELS = (process.env.OPENROUTER_TEXT_MODELS || 'openai/gpt-oss-20b:free,google/gemma-4-31b-it:free,nvidia/nemotron-3-ultra-550b-a55b:free,nvidia/nemotron-3-super-120b-a12b:free,nvidia/nemotron-3.5-lightning:free').split(',').map(s => s.trim()).filter(Boolean);
+const OPENROUTER_TEXT_MODELS = (process.env.OPENROUTER_TEXT_MODELS || 'nvidia/nemotron-3-ultra-550b-a55b:free,nvidia/nemotron-3-super-120b-a12b:free,google/gemma-4-26b-a4b-it:free,openai/gpt-oss-20b:free').split(',').map(s => s.trim()).filter(Boolean);
 const AI_OWNER_EMAIL = (process.env.AI_OWNER_EMAIL || 'demo@silelo.app').toLowerCase();
 
 /* ================== 🎭 บุคลิกของสลี๋ (Personas) ================== */
@@ -515,13 +515,13 @@ async function askAI(user, question, history) {
   } catch (e) {}
 
   msgs.push({ role: 'user', content: question.slice(0, 1000) });
-  // 🏆 ลำดับใหม่ (ฟรี 100%): Groq gpt-oss-120b → OpenRouter ฟรี → Gemini (สำรอง) → YandexGPT → mock
-  const gq = await groqChat(msgs); // 🏆 Groq gpt-oss-120b — โมเดลฟรีตัวหลัก (OpenAI โอเพนซอร์ส 120B)
-  if (gq) return gq;
-  const ds = await deepseekChat(msgs); // 🥉 DeepSeek (ถ้าพี่บอสเติมเงินแล้วจะกลับมาทำงานอัตโนมัติ)
-  if (ds) return ds;
-  const or = await openrouterChat(msgs); // 🥈 โมเดลฟรี OpenRouter
+  // 🏆 ลำดับใหม่ (ฟรี 100%): nemotron-3-ultra 550B → Groq gpt-oss-120b → DeepSeek → Gemini (สำรอง) → Yandex → mock
+  const or = await openrouterChat(msgs); // 🏆 NVIDIA nemotron-3-ultra 550B (พลังเยอะ ฟรี) — ถ้าคิวแน่นข้ามไป Groq ทันที
   if (or) return or;
+  const gq = await groqChat(msgs); // 🥇 Groq gpt-oss-120b — เร็ว เสถียร ฟรี
+  if (gq) return gq;
+  const ds = await deepseekChat(msgs); // 🥉 DeepSeek (ถ้าพี่บอสเติมเงินแล้วจะกลับมาอัตโนมัติ)
+  if (ds) return ds;
   const gm = await geminiChat(msgs); // 🎗️ Gemini (key พี่นุ — สำรองเมื่อทุกตัวล้ม)
   if (gm) return gm;
   const oa = await openaiChat(msgs); // 🤖 OpenAI (gpt-4o-mini — เมื่อมี key)
