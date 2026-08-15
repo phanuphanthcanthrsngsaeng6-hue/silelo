@@ -888,6 +888,9 @@ function lineUser(source) {
 async function ttsToFile(text, voice) {
   const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
   const { spawn, spawnSync } = require('child_process');
+  let FFMPEG = 'ffmpeg', FFPROBE = 'ffprobe';
+  try { FFMPEG = require('ffmpeg-static'); } catch (e) {}
+  try { FFPROBE = require('ffprobe-static').path; } catch (e) {}
   const tts = new MsEdgeTTS();
   // 96kbps คุณภาพดีกว่า 48kbps (msedge-tts format 48kHz มีบั๊ก ใช้ไม่ได้)
   await tts.setMetadata(voice || TTS_VOICE, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
@@ -905,14 +908,14 @@ async function ttsToFile(text, voice) {
   try {
     // 🎵 แปลง mp3 → m4a (AAC 44.1kHz mono) — LINE รองรับแน่นอน
     await new Promise((resolve, reject) => {
-      const cp = spawn('ffmpeg', ['-y', '-v', 'error', '-i', tmpMp3, '-c:a', 'aac', '-b:a', '64k', '-ar', '44100', '-ac', '1', outFile]);
+      const cp = spawn(FFMPEG, ['-y', '-v', 'error', '-i', tmpMp3, '-c:a', 'aac', '-b:a', '64k', '-ar', '44100', '-ac', '1', outFile]);
       cp.on('error', () => reject(new Error('no ffmpeg')));
       cp.on('close', code => code === 0 ? resolve() : reject(new Error('ffmpeg exit ' + code)));
     });
     try { fs.unlinkSync(tmpMp3); } catch (e) {}
     let duration = Math.round(fs.statSync(outFile).size / 12); // fallback อน
     try {
-      const probe = spawnSync('ffprobe', ['-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', outFile], { timeout: 5000 });
+      const probe = spawnSync(FFPROBE, ['-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', outFile], { timeout: 5000 });
       const d = parseFloat(String(probe.stdout || '').trim());
       if (isFinite(d) && d > 0) duration = Math.round(d * 1000);
     } catch (e) {}
