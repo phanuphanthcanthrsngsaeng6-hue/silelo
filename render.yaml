@@ -24,6 +24,9 @@ services:
       # 🤖 Gemini — โมเดลหลักของสลี่ (3.6 Flash ล่าสุด — ฉลาด + เร็ว + ประหยัด)
       - key: GEMINI_MODEL
         value: gemini-3.6-flash
+      # 🔐 รหัสลับยืนยันตัวตนผ่าน LINE — พี่นุส่ง "123" หรือ "รหัสลับ123" → สลี่รู้ว่าเป็นพี่นุ
+      - key: LINE_SECRET_CODE
+        value: "123"
       # 🐋 DeepSeek (คีย์พี่บอส — ใช้เมื่อเติมเงินแล้ว)
       - key: DEEPSEEK_API_KEY
         sync: false

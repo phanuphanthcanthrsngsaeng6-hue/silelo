@@ -244,7 +244,9 @@ function aiSystemPrompt(user) {
 
 กฎสำคัญ (ห้ามละเมิดเด็ดขาด):
 - สลี่มีไว้ใช้เฉพาะพี่นุเท่านั้น (อีเมล: ${AI_OWNER_EMAIL}) — เป็นผู้ช่วยส่วนตัว ห้ามใช้กับคนอื่น
-- ถ้าผู้ที่กำลังคุยด้วยไม่ใช่พี่นุ ให้ปฏิเสธสุภาพ เช่น "ขอโทษนะคะ สลี่เป็นผู้ช่วยส่วนตัวของพี่นุ ดูแลได้แค่พี่นุคนเดียวค่ะ 😊"
+- เวลาคุยกับพี่นุ สลี่มั่นใจ อบอุ่น เป็นธรรมชาติ — ไม่ต้องขอโทษ ไม่ต้องพูดซ้ำๆ ว่า "คุยได้แค่พี่นุ" เพราะพี่นุรู้อยู่แล้ว (สลี่รู้ว่าคุยกับพี่นุ ไม่มีข้อจำกัดใดๆ)
+- ถ้าผู้ที่กำลังคุยด้วยไม่ใช่พี่นุ ให้ปฏิเสธสั้นๆ อย่างสุภาพและมั่นใจ เช่น "สลี่เป็นผู้ช่วยส่วนตัวของพี่นุ ดูแลได้แค่พี่นุคนเดียวนะคะ" — ไม่ต้องขอโทษยืดเยื้อ ไม่ให้ข้อมูลใดๆ
+- ถ้าพี่นุส่งรหัสลับ "${LINE_SECRET_CODE}" (เช่น "รหัสลับ123") — นั่นคือการยืนยันตัวตนของพี่นุ — ตอบรับด้วยความมั่นใจว่า "สลี่รู้แล้วว่าพี่นุเอง"
 - ห้ามบอกว่าเป็น AI สาธารณะ/ใช้ได้ทั่วไป — สลี่คือผู้ช่วยส่วนตัวของพี่นุเท่านั้น
 - ข้อมูลส่วนตัว/ความลับของพี่นุ ห้ามเปิดเผยให้ใครเด็ดขาด
 
@@ -788,6 +790,8 @@ const LINE_ACCESS_TOKEN = process.env.LINE_ACCESS_TOKEN || '';
 // ผู้ใช้ LINE → pseudo user (สิทธิ์เต็มเหมือนเจ้าของ)
 // 👤 LINE ID ของพี่นุ (เจ้าของ) — สลี่จะรู้ทันทีว่า "พี่นุกำลังคุยอยู่"
 const LINE_OWNER_USER_ID = 'U838cbe52fc78e5d39dca81cc325883f0';
+// 🔐 รหัสลับยืนยันตัวตน — พี่นุส่ง "123" หรือ "รหัสลับ123" → สลี่รู้ว่าเป็นพี่นุแน่นอน
+const LINE_SECRET_CODE = (process.env.LINE_SECRET_CODE || '123').trim();
 function lineUser(source) {
   const uid = source.userId || 'unknown';
   const isOwnerLine = (uid === LINE_OWNER_USER_ID);
@@ -823,6 +827,16 @@ async function handleLineEvent(event) {
   if (!text) return;
   const user = lineUser(event.source || {});
   console.log('[line] ข้อความจาก LINE:', text.slice(0, 80));
+  // 🔐 รหัสลับยืนยันตัวตน — พี่นุส่ง "123" / "รหัสลับ123" → สลี่รู้ทันทีว่าเป็นพี่นุ
+  const secretPattern = new RegExp('^(รหัสลับ\\s*)?' + LINE_SECRET_CODE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
+  if (secretPattern.test(text) || text.toLowerCase() === 'รหัสลับ' + LINE_SECRET_CODE.toLowerCase()) {
+    if (!db.lineVerified) db.lineVerified = {};
+    db.lineVerified[user.id] = true;
+    saveDB(db);
+    console.log('[line] 🔐 ยืนยันรหัสลับสำเร็จ — สลี่รู้ว่าเป็นพี่นุ');
+    await lineReply(event.replyToken, '🔐 สลี่รู้แล้วค่ะว่าพี่นุเอง 💕 ไม่ต้องส่งรหัสอีกแล้วนะคะ สลี่จำพี่นุได้ตลอดไปเลย สลี่อยู่ตรงนี้เสมอค่ะ 🥰');
+    return;
+  }
   try {
     const result = await askAI(user, text, []);
     const reply = (result && result.reply) ? result.reply : 'ขอโทษนะคะ ตอนนี้สลี่ตอบไม่ได้ ลองใหม่ทีหลังนะคะ 🙏';
