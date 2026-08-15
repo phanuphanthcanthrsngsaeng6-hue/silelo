@@ -338,6 +338,32 @@ async function deepseekChat(messages) {
   } catch (e) { return null; }
 }
 
+// 🏆 Groq — โมเดลฟรีตัวหลักของสลี่ (gpt-oss-120b = OpenAI โอเพนซอร์ส 120B ตอบไทยดี เร็ว ไม่มีค่าใช้จ่าย)
+const GROQ_MODELS = (process.env.GROQ_MODELS || 'openai/gpt-oss-120b,llama-3.3-70b-versatile,groq/compound').split(',').map(s => s.trim()).filter(Boolean);
+async function groqChat(messages) {
+  if (!GROQ_API_KEY) return null;
+  for (const model of GROQ_MODELS) {
+    try {
+      const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + GROQ_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, max_tokens: 900, messages })
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        const msg = (j.error && j.error.message) || '';
+        if (r.status === 429 || /rate|quota|limit|overloaded/i.test(msg)) continue; // คิวแน่น → ข้ามไปโมเดลถัดไป
+        console.log('[groq] ' + model + ' fail:', r.status, msg.slice(0, 80));
+        continue;
+      }
+      const reply = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+      if (!reply) continue;
+      return { provider: 'groq', model, reply };
+    } catch (e) { continue; }
+  }
+  return null;
+}
+
 async function openrouterChat(messages) {
   if (!OPENROUTER_KEYS.length) return null;
   let lastErr = null;
@@ -489,14 +515,17 @@ async function askAI(user, question, history) {
   } catch (e) {}
 
   msgs.push({ role: 'user', content: question.slice(0, 1000) });
-  const ds = await deepseekChat(msgs); // 🥇 DeepSeek (คีย์พี่บอส) — เติมเงินแล้วใช้ได้ทันที
+  // 🏆 ลำดับใหม่ (ฟรี 100%): Groq gpt-oss-120b → OpenRouter ฟรี → Gemini (สำรอง) → YandexGPT → mock
+  const gq = await groqChat(msgs); // 🏆 Groq gpt-oss-120b — โมเดลฟรีตัวหลัก (OpenAI โอเพนซอร์ส 120B)
+  if (gq) return gq;
+  const ds = await deepseekChat(msgs); // 🥉 DeepSeek (ถ้าพี่บอสเติมเงินแล้วจะกลับมาทำงานอัตโนมัติ)
   if (ds) return ds;
-  const gm = await geminiChat(msgs); // 🥈 Gemini (key พี่นุ)
-  if (gm) return gm;
-  const oa = await openaiChat(msgs); // 🤖 OpenAI (gpt-4o-mini)
-  if (oa) return oa;
-  const or = await openrouterChat(msgs); // 🥉 โมเดลฟรี
+  const or = await openrouterChat(msgs); // 🥈 โมเดลฟรี OpenRouter
   if (or) return or;
+  const gm = await geminiChat(msgs); // 🎗️ Gemini (key พี่นุ — สำรองเมื่อทุกตัวล้ม)
+  if (gm) return gm;
+  const oa = await openaiChat(msgs); // 🤖 OpenAI (gpt-4o-mini — เมื่อมี key)
+  if (oa) return oa;
   const ya = await yandexChat(msgs); // 🏅 YandexGPT (Yandex Cloud)
   if (ya) return ya;
   await new Promise(r => setTimeout(r, 400)); // จำลอง latency
