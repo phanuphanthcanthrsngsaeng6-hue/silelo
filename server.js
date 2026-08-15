@@ -400,6 +400,8 @@ async function openrouterChat(messages) {
         if (!r.ok) throw new Error(`OpenRouter ${r.status}: ${(j.error && j.error.message || '').slice(0, 100)}`);
         const reply = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
         if (!reply) throw new Error('OpenRouter คืนคำตอบว่าง');
+        // 🧠 โมเดล nemotron เทรนด้วยข้อมูล Gemini → มักตอบว่า "Gemini" — แก้ให้ตอบชื่อจริง
+        if (/nemotron/i.test(model)) reply = reply.replace(/Gemini/gi, 'Nemotron 3 Ultra 550B');
         return { provider: 'openrouter', model, reply };
       } catch (e) { lastErr = e.message; }
     }
