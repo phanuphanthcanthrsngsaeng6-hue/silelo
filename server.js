@@ -25,6 +25,9 @@ const PORT = process.env.PORT || 8080;
 const JWT_SECRET = process.env.JWT_SECRET || 'silelo-secret-2025';
 const DATA_DIR = path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
+// 💾 Persistent memory — ความจำของสลี่เก็บบน GitHub Secret Gist (ไม่หายแม้ deploy/restart)
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
+const GIST_ID = process.env.GIST_ID || '821cfcc8388a154a7a6716dafe129d83';
 
 /* ================== DATA LAYER (JSON Store) ================== */
 const DEFAULT_DB = {
@@ -63,6 +66,53 @@ function loadDB() {
 
 function saveDB(db) {
   fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+  // 💾 ซิงก์ความจำขึ้น Gist (ถี่สุดทุก 30 วินาที — ไม่รบกวน GitHub API)
+  if (!GITHUB_TOKEN) return;
+  gistDirty = true;
+  if (!gistTimer) {
+    const snapshot = JSON.stringify(db, null, 2);
+    gistTimer = setTimeout(async () => {
+      gistTimer = null;
+      if (!gistDirty) return;
+      gistDirty = false;
+      try {
+        const r = await fetch('https://api.github.com/gists/' + GIST_ID, {
+          method: 'PATCH',
+          headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json', 'User-Agent': 'silelo' },
+          body: JSON.stringify({ files: { 'db.json': { content: snapshot } } })
+        });
+        if (r.ok) console.log('[gist] 💾 บันทึกความจำของสลี่ขึ้น Gist สำเร็จ');
+        else console.log('[gist] save fail:', r.status);
+      } catch (e) { console.log('[gist] save error:', e.message); }
+    }, 30000);
+  }
+}
+
+// 📥 โหลดความจำจาก Gist กลับมาหลัง restart/deploy — สลี่จะจำทุกอย่างได้ตลอด
+let gistDirty = false;
+let gistTimer = null;
+async function syncDBFromGist() {
+  if (!GITHUB_TOKEN) return;
+  try {
+    const r = await fetch('https://api.github.com/gists/' + GIST_ID, {
+      headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'User-Agent': 'silelo' }
+    });
+    if (!r.ok) return;
+    const g = await r.json();
+    const content = g.files && g.files['db.json'] && g.files['db.json'].content;
+    if (!content) return;
+    const gistDb = JSON.parse(content);
+    // merge: gist เป็นหลัก + เก็บของ local ที่ gist ยังไม่มี (dedupe ด้วย id)
+    const merged = { ...DEFAULT_DB, ...gistDb };
+    const seen = new Set((merged.users || []).map(u => u && u.id));
+    for (const u of db.users || []) if (u && u.id && !seen.has(u.id)) merged.users.push(u);
+    const msgSeen = new Set((merged.messages || []).map(m => m && m.id));
+    for (const m of db.messages || []) if (m && m.id && !msgSeen.has(m.id)) merged.messages.push(m);
+    merged.messages = merged.messages.slice(-200);
+    db = merged;
+    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+    console.log('[gist] 📥 สลี่จำได้แล้ว! users:', db.users.length, '| messages:', db.messages.length, '| memories:', Object.keys(db.memories || {}).length);
+  } catch (e) { console.log('[gist] load error:', e.message); }
 }
 
 let db = loadDB();
@@ -837,9 +887,21 @@ async function handleLineEvent(event) {
     await lineReply(event.replyToken, '🔐 สลี่รู้แล้วค่ะว่าพี่นุเอง 💕 ไม่ต้องส่งรหัสอีกแล้วนะคะ สลี่จำพี่นุได้ตลอดไปเลย สลี่อยู่ตรงนี้เสมอค่ะ 🥰');
     return;
   }
+  // 💬 บันทึกความทรงจำการสนทนาบน LINE (สลี่จำบทสนทนาก่อนหน้าได้ แม้ข้ามวัน)
+  if (!db.lineHistory) db.lineHistory = {};
+  if (!db.lineHistory[user.id]) db.lineHistory[user.id] = [];
+  const hist = db.lineHistory[user.id];
+  hist.push({ role: 'user', content: text.slice(0, 500), time: Date.now() });
+  db.lineHistory[user.id] = hist.slice(-30); // จำ 30 ข้อความล่าสุด
+  saveDB(db);
   try {
-    const result = await askAI(user, text, []);
+    // 🧠 ส่งประวัติการสนทนาก่อนหน้าให้ AI — สลี่ตอบต่อเนื่อง ไม่ลืมว่าคุยอะไรกัน
+    const history = hist.slice(0, -1).map(m => ({ role: m.role, content: m.content }));
+    const result = await askAI(user, text, history);
     const reply = (result && result.reply) ? result.reply : 'ขอโทษนะคะ ตอนนี้สลี่ตอบไม่ได้ ลองใหม่ทีหลังนะคะ 🙏';
+    // 💾 จำคำตอบของสลี่ด้วย (เวลาเล่าย้อนหลัง สลี่จะพูดต่อได้)
+    db.lineHistory[user.id].push({ role: 'assistant', content: String(reply).slice(0, 500), time: Date.now() });
+    saveDB(db);
     await lineReply(event.replyToken, reply);
   } catch (e) {
     console.log('[line] AI error:', e.message);
@@ -952,5 +1014,7 @@ const interval = setInterval(() => {
 wss.on('close', () => clearInterval(interval));
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`✅ Silelo💯✨️ backend กำลังทำงานที่ http://localhost:${PORT}`);
+  console.log('🚀 Silelo server พร้อมใช้งานที่ http://0.0.0.0:' + PORT);
+  // 💾 ดึงความจำของสลี่กลับมาจาก Gist (ไม่ลืมแม้ redeploy)
+  setTimeout(syncDBFromGist, 1500);
 });
