@@ -26,7 +26,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'silelo-secret-2025';
 const DATA_DIR = path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 // 💾 Persistent memory — ความจำของสลี่เก็บบน GitHub Secret Gist (ไม่หายแม้ deploy/restart)
-const GITHUB_TOKEN = (process.env.GITHUB_TOKEN || '').replace(/^x-access-token:/, '');
+const GITHUB_TOKEN = (process.env.GITHUB_TOKEN || '').replace(/^x-access-token:/, '').trim();
 const GIST_ID = process.env.GIST_ID || '821cfcc8388a154a7a6716dafe129d83';
 
 /* ================== DATA LAYER (JSON Store) ================== */
@@ -67,7 +67,8 @@ function loadDB() {
 function saveDB(db) {
   fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
   // 💾 ซิงก์ความจำขึ้น Gist (ถี่สุดทุก 30 วินาที — ไม่รบกวน GitHub API)
-  if (!GITHUB_TOKEN) return;
+  // ⚠️ รอ syncDBFromGist รอบแรกเสร็จก่อน (กัน seed เขียนทับ gist ที่มีข้อมูล)
+  if (!GITHUB_TOKEN || !gistReady) return;
   gistDirty = true;
   if (!gistTimer) {
     gistTimer = setTimeout(async () => {
@@ -92,16 +93,17 @@ function saveDB(db) {
 // 📥 โหลดความจำจาก Gist กลับมาหลัง restart/deploy — สลี่จะจำทุกอย่างได้ตลอด
 let gistDirty = false;
 let gistTimer = null;
+let gistReady = false; // true = sync รอบแรกเสร็จแล้ว (อนุญาตให้ PATCH ได้)
 async function syncDBFromGist() {
-  if (!GITHUB_TOKEN) return;
+  if (!GITHUB_TOKEN) { gistReady = true; return; }
   try {
     const r = await fetch('https://api.github.com/gists/' + GIST_ID, {
       headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'User-Agent': 'silelo' }
     });
-    if (!r.ok) return;
+    if (!r.ok) { gistReady = true; console.log('[gist] load fail:', r.status); return; }
     const g = await r.json();
     const content = g.files && g.files['db.json'] && g.files['db.json'].content;
-    if (!content) return;
+    if (!content) { gistReady = true; return; }
     const gistDb = JSON.parse(content);
     // merge: gist เป็นหลัก + เก็บของ local ที่ gist ยังไม่มี (dedupe ด้วย id)
     const merged = { ...DEFAULT_DB, ...gistDb };
@@ -112,8 +114,9 @@ async function syncDBFromGist() {
     merged.messages = merged.messages.slice(-200);
     db = merged;
     fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
+    gistReady = true;
     console.log('[gist] 📥 สลี่จำได้แล้ว! users:', db.users.length, '| messages:', db.messages.length, '| memories:', Object.keys(db.memories || {}).length);
-  } catch (e) { console.log('[gist] load error:', e.message); }
+  } catch (e) { gistReady = true; console.log('[gist] load error:', e.message); }
 }
 
 let db = loadDB();
