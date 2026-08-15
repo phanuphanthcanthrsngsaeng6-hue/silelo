@@ -888,9 +888,8 @@ function lineUser(source) {
 async function ttsToFile(text, voice) {
   const { MsEdgeTTS, OUTPUT_FORMAT } = require('msedge-tts');
   const { spawn, spawnSync } = require('child_process');
-  let FFMPEG = 'ffmpeg', FFPROBE = 'ffprobe';
+  let FFMPEG = 'ffmpeg';
   try { FFMPEG = require('ffmpeg-static'); } catch (e) {}
-  try { FFPROBE = require('ffprobe-static').path; } catch (e) {}
   const tts = new MsEdgeTTS();
   // 96kbps คุณภาพดีกว่า 48kbps (msedge-tts format 48kHz มีบั๊ก ใช้ไม่ได้)
   await tts.setMetadata(voice || TTS_VOICE, OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3);
@@ -913,11 +912,12 @@ async function ttsToFile(text, voice) {
       cp.on('close', code => code === 0 ? resolve() : reject(new Error('ffmpeg exit ' + code)));
     });
     try { fs.unlinkSync(tmpMp3); } catch (e) {}
-    let duration = Math.round(fs.statSync(outFile).size / 12); // fallback อน
+    let duration = Math.round(fs.statSync(outFile).size / 8); // fallback อน (AAC 64kbps = 8B/ms)
     try {
-      const probe = spawnSync(FFPROBE, ['-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', outFile], { timeout: 5000 });
-      const d = parseFloat(String(probe.stdout || '').trim());
-      if (isFinite(d) && d > 0) duration = Math.round(d * 1000);
+      // อ่าน duration จาก stderr ของ ffmpeg (ไม่ต้องใช้ ffprobe ใหญ่ 336MB)
+      const probe = spawnSync(FFMPEG, ['-i', outFile], { timeout: 5000 });
+      const m = String(probe.stderr || '').match(/Duration: (\d+):(\d+):([\d.]+)/);
+      if (m) duration = Math.round(((+m[1]) * 3600 + (+m[2]) * 60 + (+m[3])) * 1000);
     } catch (e) {}
     return { file: outFile, duration: Math.min(59000, Math.max(1000, duration)), size: fs.statSync(outFile).size };
   } catch (e) {
