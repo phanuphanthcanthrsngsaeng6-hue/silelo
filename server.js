@@ -70,18 +70,19 @@ function saveDB(db) {
   if (!GITHUB_TOKEN) return;
   gistDirty = true;
   if (!gistTimer) {
-    const snapshot = JSON.stringify(db, null, 2);
     gistTimer = setTimeout(async () => {
       gistTimer = null;
       if (!gistDirty) return;
       gistDirty = false;
       try {
+        // 📸 ถ่าย snapshot ณ ตอน PATCH (ไม่ใช่ตอนตั้ง timer) — ข้อมูลล่าสุดไม่ตกหล่น
+        const snapshot = JSON.stringify(db, null, 2);
         const r = await fetch('https://api.github.com/gists/' + GIST_ID, {
           method: 'PATCH',
           headers: { 'Authorization': 'Bearer ' + GITHUB_TOKEN, 'Content-Type': 'application/json', 'User-Agent': 'silelo' },
           body: JSON.stringify({ files: { 'db.json': { content: snapshot } } })
         });
-        if (r.ok) console.log('[gist] 💾 บันทึกความจำของสลี่ขึ้น Gist สำเร็จ');
+        if (r.ok) console.log('[gist] 💾 บันทึกความจำของสลี่ขึ้น Gist สำเร็จ (' + new Date().toISOString().slice(11, 19) + ')');
         else console.log('[gist] save fail:', r.status);
       } catch (e) { console.log('[gist] save error:', e.message); }
     }, 30000);
