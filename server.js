@@ -342,7 +342,7 @@ async function deepseekChat(messages) {
 // 🏆 Groq — โมเดลฟรีตัวหลักของสลี่ (gpt-oss-120b = OpenAI โอเพนซอร์ส 120B ตอบไทยดี เร็ว ไม่มีค่าใช้จ่าย)
 const GROQ_MODELS = (process.env.GROQ_MODELS || 'openai/gpt-oss-120b,llama-3.3-70b-versatile,groq/compound').split(',').map(s => s.trim()).filter(Boolean);
 async function groqChat(messages) {
-  if (!GROQ_API_KEY) return null;
+  if (!GROQ_API_KEY) { logAI('groq', 'no key'); return null; }
   for (const model of GROQ_MODELS) {
     try {
       const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -353,16 +353,27 @@ async function groqChat(messages) {
       const j = await r.json();
       if (!r.ok) {
         const msg = (j.error && j.error.message) || '';
+        logAI('groq', model + ' → ' + r.status + ' ' + msg.slice(0, 90));
         if (r.status === 429 || /rate|quota|limit|overloaded/i.test(msg)) continue; // คิวแน่น → ข้ามไปโมเดลถัดไป
         console.log('[groq] ' + model + ' fail:', r.status, msg.slice(0, 80));
         continue;
       }
       const reply = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
       if (!reply) continue;
+      logAI('groq', model + ' ✅');
       return { provider: 'groq', model, reply };
-    } catch (e) { continue; }
+    } catch (e) { logAI('groq', model + ' ERR ' + e.message.slice(0, 90)); continue; }
   }
   return null;
+}
+
+// 🔍 บันทึก provider ที่ตอบ + error ลง Gist (ดูได้ว่า AI ตัวไหนทำงาน/ล้ม)
+function logAI(provider, msg) {
+  try {
+    if (!db.aiLog) db.aiLog = [];
+    db.aiLog.push({ t: new Date().toISOString().slice(11, 19), p: provider, m: msg });
+    db.aiLog = db.aiLog.slice(-30);
+  } catch (e) {}
 }
 
 async function openrouterChat(messages) {
@@ -522,18 +533,19 @@ async function askAI(user, question, history) {
   msgs.push({ role: 'user', content: question.slice(0, 1000) });
   // 🏆 ลำดับใหม่ (ฟรี 100%): nemotron-3-ultra 550B → Groq gpt-oss-120b → DeepSeek → Gemini (สำรอง) → Yandex → mock
   const or = await openrouterChat(msgs); // 🏆 NVIDIA nemotron-3-ultra 550B (พลังเยอะ ฟรี) — ถ้าคิวแน่นข้ามไป Groq ทันที
-  if (or) return or;
+  if (or) { logAI('chain', '✅ openrouter ' + or.model); return or; }
   const gq = await groqChat(msgs); // 🥇 Groq gpt-oss-120b — เร็ว เสถียร ฟรี
-  if (gq) return gq;
+  if (gq) { logAI('chain', '✅ groq ' + gq.model); return gq; }
   const ds = await deepseekChat(msgs); // 🥉 DeepSeek (ถ้าพี่บอสเติมเงินแล้วจะกลับมาอัตโนมัติ)
-  if (ds) return ds;
+  if (ds) { logAI('chain', '✅ deepseek ' + ds.model); return ds; }
   const gm = await geminiChat(msgs); // 🎗️ Gemini (key พี่นุ — สำรองเมื่อทุกตัวล้ม)
-  if (gm) return gm;
+  if (gm) { logAI('chain', '✅ gemini ' + gm.model); return gm; }
   const oa = await openaiChat(msgs); // 🤖 OpenAI (gpt-4o-mini — เมื่อมี key)
-  if (oa) return oa;
+  if (oa) { logAI('chain', '✅ openai ' + oa.model); return oa; }
   const ya = await yandexChat(msgs); // 🏅 YandexGPT (Yandex Cloud)
-  if (ya) return ya;
+  if (ya) { logAI('chain', '✅ yandex ' + ya.model); return ya; }
   await new Promise(r => setTimeout(r, 400)); // จำลอง latency
+  logAI('chain', '✅ mock');
   return { provider: 'mock', reply: aiMockReply(question) };
 }
 
