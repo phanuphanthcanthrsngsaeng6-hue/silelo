@@ -323,27 +323,6 @@ function aiMockReply(q) {
   return 'ขอบคุณสำหรับคำถามครับ 🤖 ผมเข้าใจคำถามว่า: "' + q + '"\n\nในเวอร์ชันเต็ม ระบบนี้เชื่อมต่อกับ AI (เช่น GPT / Gemini) เพื่อตอบคำถามเฉพาะธุรกิจของคุณได้แบบเรียลไทม์ — ตอนนี้เป็นโหมดสาธิตครับ ลองถามผมเรื่อง "สรุปโปรเจกต์" "วิเคราะห์ยอดขาย" หรือ "แนะนำฟีเจอร์" ได้เลยครับ';
 }
 
-async function deepseekChat(messages) {
-  if (!DEEPSEEK_API_KEY) return null;
-  try {
-    const r = await fetch('https://api.deepseek.com/chat/completions', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + DEEPSEEK_API_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: DEEPSEEK_MODEL, max_tokens: 800, messages })
-    });
-    const j = await r.json();
-    if (!r.ok) {
-      const msg = (j.error && j.error.message) || '';
-      // คีย์เสีย/ไม่มีเครดิต (401/402/Insufficient) → ข้ามไป provider ถัดไปทันที (ไม่เสียเวลา)
-      if (r.status === 401 || r.status === 402 || /insufficient|invalid|authentication/i.test(msg)) return null;
-      throw new Error('DeepSeek ' + r.status + ': ' + msg.slice(0, 100));
-    }
-    const reply = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
-    if (!reply) return null;
-    return { provider: 'deepseek', model: DEEPSEEK_MODEL, reply };
-  } catch (e) { return null; }
-}
-
 // 🏆 Groq — โมเดลฟรีตัวหลักของสลี่ (gpt-oss-120b = OpenAI โอเพนซอร์ส 120B ตอบไทยดี เร็ว ไม่มีค่าใช้จ่าย)
 const GROQ_MODELS = (process.env.GROQ_MODELS || 'openai/gpt-oss-120b,llama-3.3-70b-versatile,qwen/qwen3.6-27b,openai/gpt-oss-20b,groq/compound-mini,llama-3.1-8b-instant').split(',').map(s => s.trim()).filter(Boolean);
 async function groqChat(messages, extSignal) {
@@ -471,37 +450,6 @@ async function pollinationsChat(messages, extSignal) {
   } catch (e) { return null; }
 }
 
-/* ---- YandexGPT (Yandex Cloud Foundation Models) ---- */
-const YANDEXGPT_API_KEY = process.env.YANDEXGPT_API_KEY || '';
-const YANDEXGPT_FOLDER_ID = process.env.YANDEXGPT_FOLDER_ID || '';
-const YANDEXGPT_MODEL = process.env.YANDEXGPT_MODEL || 'yandexgpt-lite/latest';
-
-async function yandexChat(messages) {
-  if (!YANDEXGPT_API_KEY || !YANDEXGPT_FOLDER_ID) return null;
-  try {
-    const r = await fetch('https://llm.api.cloud.yandex.net/foundationModels/v1/completion', {
-      method: 'POST',
-      headers: { 'Authorization': 'Api-Key ' + YANDEXGPT_API_KEY, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        modelUri: 'gpt://' + YANDEXGPT_FOLDER_ID + '/' + YANDEXGPT_MODEL,
-        messages: messages.map(m => ({ role: m.role, text: m.content })),
-        completionOptions: { maxTokens: 800, temperature: 0.7 }
-      })
-    });
-    const j = await r.json();
-    if (!r.ok) {
-      const msg = (j.error && j.error.message) || '';
-      // key ผิด / ยังไม่ให้สิทธิ์ → ข้ามไป provider ถัดไปทันที (ไม่เสียเวลา)
-      if (r.status === 401 || r.status === 403 || /permission|unauthorized|invalid|does not match/i.test(msg)) return null;
-      throw new Error('YandexGPT ' + r.status + ': ' + msg.slice(0, 100));
-    }
-    const alts = j.result && j.result.alternatives;
-    const reply = alts && alts[0] && alts[0].message && alts[0].message.text;
-    if (!reply) return null;
-    return { provider: 'yandexgpt', model: YANDEXGPT_MODEL, reply };
-  } catch (e) { return null; }
-}
-
 /* ---- Gemini (Google AI Studio / Generative Language API) ---- */
 // รองรับหลาย keys: GEMINI_API_KEYS="k1,k2,k3" หรือ GEMINI_API_KEY + GEMINI_API_KEY2 + GEMINI_API_KEY3
 const GEMINI_API_KEYS = (process.env.GEMINI_API_KEYS || '')
@@ -553,38 +501,6 @@ async function geminiChat(messages, extSignal) {
   }
   return null;
 }
-
-/* ---- OpenAI (รองรับหลาย keys: OPENAI_API_KEYS="k1,k2" | 1 key: OPENAI_API_KEY) ---- */
-const OPENAI_API_KEYS = (process.env.OPENAI_API_KEYS || process.env.OPENAI_API_KEY || '').split(',').map(k => k.trim()).filter(Boolean);
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-let openaiIdx = 0;
-async function openaiChat(messages) {
-  if (!OPENAI_API_KEYS.length) return null;
-  const start = (openaiIdx++) % OPENAI_API_KEYS.length;
-  for (let i = 0; i < OPENAI_API_KEYS.length; i++) {
-    const key = OPENAI_API_KEYS[(start + i) % OPENAI_API_KEYS.length];
-    try {
-      const r = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: OPENAI_MODEL, max_tokens: 800, messages })
-      });
-      const j = await r.json();
-      if (!r.ok) {
-        const msg = (j.error && j.error.message) || '';
-        const bad = r.status === 401 || r.status === 403 || /insufficient|invalid|quota|billing/i.test(msg);
-        if (bad) { console.log('[openai] key#' + ((start + i) % OPENAI_API_KEYS.length + 1) + '/' + OPENAI_API_KEYS.length + ' ข้าม: ' + r.status + ' ' + msg.slice(0, 60)); continue; }
-        throw new Error('OpenAI ' + r.status + ': ' + msg.slice(0, 100));
-      }
-      const reply = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
-      if (!reply) continue;
-      console.log('[openai] ตอบด้วย key#' + ((start + i) % OPENAI_API_KEYS.length + 1) + '/' + OPENAI_API_KEYS.length + ' (' + OPENAI_MODEL + ')');
-      return { provider: 'openai', model: OPENAI_MODEL, reply };
-    } catch (e) { continue; }
-  }
-  return null;
-}
-
 async function askAI(user, question, history) {
   const msgs = [{ role: 'system', content: aiSystemPrompt(user) }];
   if (Array.isArray(history) && history.length) {
@@ -603,7 +519,7 @@ async function askAI(user, question, history) {
 
   msgs.push({ role: 'user', content: question.slice(0, 1000) });
   // 🏆 โซ่ใหม่ (เร็วสุดนำ ฟรี 100%): ⚡RACE[Groq 6 โมเดล vs Gemini 9 keys] → OpenRouter (8 วิ) → Pollinations (ฟรี) → mock
-  //    ☠️ ถูกฆ่าออกจากโซ่: DeepSeek (เครดิตหมด 402), YandexGPT (ไม่มี key), OpenAI (ไม่มี key) — ฟังก์ชันเก็บไว้ เติมเงินเมื่อไหร่ค่อยเปิด
+  //    ☠️ ถูกปลดออกจากโค้ดแล้ว: DeepSeek (เสียเงิน), YandexGPT (ไม่มี key), OpenAI (ไม่มี key) — โซ่เหลือแค่ฟรี 100%
   const fast = await raceProviders([
     s => groqChat(msgs, s),    // 🥇 Groq gpt-oss-120b — เร็ว เสถียร ฟรี (ปกติชนะ ~1-2 วิ)
     s => geminiChat(msgs, s)   // 🥈 Gemini 9 keys — สำรองชั้นดี ตอบไทยเก่ง
@@ -767,8 +683,6 @@ const IDEOGRAM_API_KEY = process.env.IDEOGRAM_API_KEY || ''; // ใส่คี�
 const IDEOGRAM_MODEL = process.env.IDEOGRAM_MODEL || 'V_2_TURBO';
 const OPENROUTER_KEYS = (process.env.OPENROUTER_API_KEY || '').split(',').map(s => s.trim()).filter(Boolean);
 const OPENROUTER_IMAGE_MODEL = process.env.OPENROUTER_IMAGE_MODEL || 'google/gemini-2.5-flash-image';
-const DEEPSEEK_API_KEY = (process.env.DEEPSEEK_API_KEY || '').trim(); // คีย์ DeepSeek ของพี่บอส (เติมเงินแล้วใช้ได้ทันที)
-const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash'; // 🔥 V4 Flash ใหม่ล่าสุด (ถูกกว่า V3 อีก) — ใช้ได้กับคีย์พี่บอส
 
 const RATIO_MAP = { '1:1': 'ASPECT_1_1', '16:9': 'ASPECT_16_9', '9:16': 'ASPECT_10_16', '4:3': 'ASPECT_4_3', '3:4': 'ASPECT_3_4' };
 const RATIO_PX = { '1:1': '1024x1024', '16:9': '1280x720', '9:16': '720x1280', '4:3': '1152x864', '3:4': '864x1152' };
