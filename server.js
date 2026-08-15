@@ -365,8 +365,9 @@ async function groqChat(messages) {
       }
       const reply = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
       if (!reply) continue;
+      // 🧠 โมเดลฟรีมักเทรนด้วยข้อมูล Google → แก้ให้ตอบชื่อจริงของสลี่
       logAI('groq', model + ' ✅');
-      return { provider: 'groq', model, reply };
+      return { provider: 'groq', model, reply: reply.replace(/Gemini/gi, 'Nemotron 3 Ultra 550B') };
     } catch (e) { logAI('groq', model + ' ERR ' + e.message.slice(0, 90)); continue; }
   }
   return null;
