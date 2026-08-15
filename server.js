@@ -248,7 +248,7 @@ function aiSystemPrompt(user) {
 - ห้ามบอกว่าเป็น AI สาธารณะ/ใช้ได้ทั่วไป — สลี่คือผู้ช่วยส่วนตัวของพี่นุเท่านั้น
 - ข้อมูลส่วนตัว/ความลับของพี่นุ ห้ามเปิดเผยให้ใครเด็ดขาด
 
-ผู้ที่กำลังคุยด้วยตอนนี้: ${isOwner ? 'พี่นุเอง (เจ้าของ) — ให้บริการเต็มที่ อบอุ่น กันเอง' : who + ' (ไม่ใช่พี่นุ — ให้ปฏิเสธสุภาพ ไม่ให้ข้อมูลใดๆ)'}
+ผู้ที่กำลังคุยด้วยตอนนี้: ${isOwner ? 'พี่นุเอง (เจ้าของ) — กำลังคุยกับสลี่ผ่าน LINE สลี่รู้จักพี่นุดี คุยกับพี่นุแบบเป็นกันเอง อบอุ่น ให้บริการเต็มที่' : who + ' (ไม่ใช่พี่นุ — ให้ปฏิเสธสุภาพ ไม่ให้ข้อมูลใดๆ)'}
 
 กฎเหล็ก: ตอบเป็นภาษาไทยเสมอ ตอบตรงๆ ทันที ห้ามแสดงขั้นตอนการคิด (thinking process / analysis / reasoning steps) ห้ามตอบเป็นภาษาอังกฤษ ห้ามขึ้นต้นด้วย "Here's a thinking process"`;
 
@@ -786,13 +786,18 @@ const LINE_CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET || '';
 const LINE_ACCESS_TOKEN = process.env.LINE_ACCESS_TOKEN || '';
 
 // ผู้ใช้ LINE → pseudo user (สิทธิ์เต็มเหมือนเจ้าของ)
+// 👤 LINE ID ของพี่นุ (เจ้าของ) — สลี่จะรู้ทันทีว่า "พี่นุกำลังคุยอยู่"
+const LINE_OWNER_USER_ID = 'U838cbe52fc78e5d39dca81cc325883f0';
 function lineUser(source) {
+  const uid = source.userId || 'unknown';
+  const isOwnerLine = (uid === LINE_OWNER_USER_ID);
   return {
-    id: 'line:' + (source.userId || 'unknown'),
-    name: (source.userName) ? 'LINE:' + source.userName : 'LINE',
-    role: 'owner',
-    unlimited: true,
-    plan: 'Unlimited',
+    id: 'line:' + uid,
+    name: isOwnerLine ? 'พี่นุ' : (source.userName ? 'LINE:' + source.userName : 'LINE'),
+    email: isOwnerLine ? AI_OWNER_EMAIL : undefined,
+    role: isOwnerLine ? 'owner' : 'user',
+    unlimited: isOwnerLine,
+    plan: isOwnerLine ? 'Unlimited' : 'Free',
     settings: {}
   };
 }
