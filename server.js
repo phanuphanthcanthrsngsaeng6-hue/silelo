@@ -1065,7 +1065,7 @@ app.post('/api/run', async (req, res) => {
         const action = /uninstall/.test(src) ? 'uninstall -y' : 'install --quiet';
         const ok = await ensurePip();
         if (!ok) return res.status(500).json({ ok: false, error: 'ไม่มี pip บนเครื่อง' });
-        cmd = 'python3 -m pip ' + action + ' ' + pkgs.split(/\s+/).filter(x => !x.startsWith('-') && x !== 'install' && x !== 'uninstall').join(' ') + ' 2>&1 | tail -12';
+        cmd = 'python3 -m pip ' + action + ' --break-system-packages ' + pkgs.split(/\s+/).filter(x => !x.startsWith('-') && x !== 'install' && x !== 'uninstall').join(' ') + ' 2>&1 | tail -12';
       }
       const out = await sbExec(cmd, 110000);
       return res.json({ ok: true, stdout: (out.stdout + out.stderr).slice(0, 5000), stderr: '', code: out.code, timeMs: Date.now() - t0, lang: 'install', engine: 'silelo' });
@@ -1081,7 +1081,7 @@ app.post('/api/run', async (req, res) => {
         if (chk.code !== 0) {
           const ok = await ensurePip();
           if (ok) {
-            await sbExec('python3 -m pip install --quiet ' + p + ' 2>&1 | tail -3', 90000);
+            await sbExec('python3 -m pip install --quiet --break-system-packages ' + p + ' 2>&1 | tail -3', 90000);
             autoInstalled.push(p);
           }
         }
@@ -1089,8 +1089,12 @@ app.post('/api/run', async (req, res) => {
     }
 
     /* 3) รัน */
-    let cmd = null, args = [];
-    if (l === 'python') { cmd = 'python3'; args = ['-u', '-']; }
+    let cmd = null, args = [], runCwd = null;
+    if (l === 'python') {
+      runCwd = fs.mkdtempSync(require('path').join(require('os').tmpdir(), 'sirun-'));
+      fs.writeFileSync(require('path').join(runCwd, 'main.py'), src);
+      cmd = 'python3'; args = ['-u', 'main.py'];
+    }
     else if (l === 'javascript') { cmd = 'node'; args = ['-e', src]; }
     else if (l === 'bash') { cmd = 'bash'; args = ['-c', src]; }
     else return res.status(400).json({ ok: false, error: 'silelo runner รองรับ python / javascript / bash' });
@@ -1099,7 +1103,7 @@ app.post('/api/run', async (req, res) => {
     let stdout = '', stderr = '', exitCode = -1;
     try {
       const out = await new Promise((resolve, reject) => {
-        const cp = spawn(cmd, args, { env: Object.assign({}, process.env, { PATH: (process.env.PATH || '/usr/local/bin:/usr/bin:/bin') + ':/usr/local/bin' }), stdio: ['ignore', 'pipe', 'pipe'] });
+        const cp = spawn(cmd, args, { cwd: runCwd || undefined, env: Object.assign({}, process.env, { PATH: (process.env.PATH || '/usr/local/bin:/usr/bin:/bin') + ':/usr/local/bin' }), stdio: ['ignore', 'pipe', 'pipe'] });
         let o = '', e = '';
         cp.stdout.on('data', d => { o += d.toString(); if (o.length > 60000) { try { cp.kill('SIGKILL'); } catch (x) {} } });
         cp.stderr.on('data', d => { e += d.toString(); if (e.length > 60000) { try { cp.kill('SIGKILL'); } catch (x) {} } });
