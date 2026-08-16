@@ -1164,7 +1164,7 @@ app.post('/api/run', async (req, res) => {
     const { spawn } = require('child_process');
     let stdout = '', stderr = '', exitCode = -1;
     if (pre) {
-      const po = await sbExec(pre, 60000);
+      const po = await sbExec('cd ' + JSON.stringify(runCwd) + ' && ' + pre, 60000);
       if (po.code !== 0) {
         return res.json({ ok: true, stdout: '', stderr: (po.stdout + po.stderr).slice(0, 4000), code: po.code, timeMs: Date.now() - t0, lang: l, engine: 'silelo' });
       }
