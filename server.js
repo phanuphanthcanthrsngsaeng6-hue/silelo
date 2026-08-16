@@ -1054,21 +1054,34 @@ app.post('/api/run', async (req, res) => {
     const t0 = Date.now();
 
     /* 1) ติดตั้งโดยตรง: pip install / npm install */
-    if (install || /^\s*(?:pip|pip3|python3?\s+-m\s+pip)\s+(?:install|uninstall)\s+/.test(src) || /^\s*(?:npm|npx)\s+install\s+/.test(src)) {
-      let pkgs = src.trim();
+    const INSTALL_RE = /^\s*(?:(pip|pip3|python3?\s+-m\s+pip)|(npm|npx)|(apt|apt-get)|(gem)|(cargo)|(composer))\s+(install|uninstall|add|remove|update)\s+/;
+    if (install || INSTALL_RE.test(src)) {
+      const m2 = src.trim().match(INSTALL_RE);
+      const mgr = m2 ? (m2[1] ? 'pip' : m2[2] ? 'npm' : m2[3] ? 'apt' : m2[4] ? 'gem' : m2[5] ? 'cargo' : 'composer') : 'pip';
+      const action = m2 ? m2[6] : 'install';
+      let pkgs = String(src.trim()).replace(/^\s*(?:pip|pip3|python3?\s+-m\s+pip|npm|npx|apt|apt-get|gem|cargo|composer)\s+(?:install|uninstall|add|remove|update)\s*/, '');
+      const names = pkgs.split(/\s+/).filter(x => x && !x.startsWith('-'));
+      if (!names.length) return res.status(400).json({ ok: false, error: 'ระบุชื่อ package ด้วย' });
       let cmd;
-      if (/(?:npm|npx)\s+install/.test(pkgs)) {
-        pkgs = pkgs.replace(/^\s*(?:npm|npx)\s+install\s*/, '');
-        cmd = 'cd ' + JSON.stringify(process.env.HOME || '/tmp') + ' && npm install ' + pkgs.split(/\s+/).filter(x => !x.startsWith('-') && x !== 'install').join(' ') + ' --no-audit --no-fund 2>&1 | tail -12';
-      } else {
-        pkgs = pkgs.replace(/^\s*(?:pip|pip3|python3?\s+-m\s+pip)\s+(?:install|uninstall)\s*/, '');
-        const action = /uninstall/.test(src) ? 'uninstall -y' : 'install --quiet';
+      if (mgr === 'npm') {
+        cmd = 'cd ' + JSON.stringify(process.env.HOME || '/tmp') + ' && npm ' + (action === 'uninstall' || action === 'remove' ? 'uninstall' : 'install') + ' ' + names.join(' ') + ' --no-audit --no-fund 2>&1 | tail -12';
+      } else if (mgr === 'pip') {
         const ok = await ensurePip();
         if (!ok) return res.status(500).json({ ok: false, error: 'ไม่มี pip บนเครื่อง' });
-        cmd = 'python3 -m pip ' + action + ' --break-system-packages ' + pkgs.split(/\s+/).filter(x => !x.startsWith('-') && x !== 'install' && x !== 'uninstall').join(' ') + ' 2>&1 | tail -12';
+        const act2 = (action === 'uninstall' || action === 'remove') ? 'uninstall -y' : 'install --quiet';
+        cmd = 'python3 -m pip ' + act2 + ' --break-system-packages ' + names.join(' ') + ' 2>&1 | tail -12';
+      } else if (mgr === 'apt') {
+        const act3 = (action === 'uninstall' || action === 'remove') ? 'remove -y' : 'install -y';
+        cmd = 'apt-get update -qq && apt-get ' + act3 + ' ' + names.join(' ') + ' 2>&1 | tail -14';
+      } else if (mgr === 'gem') {
+        cmd = 'gem install ' + names.join(' ') + ' --no-document 2>&1 | tail -12';
+      } else if (mgr === 'cargo') {
+        cmd = 'cargo install ' + names.join(' ') + ' 2>&1 | tail -12';
+      } else {
+        cmd = 'composer require ' + names.join(' ') + ' --no-interaction 2>&1 | tail -12';
       }
-      const out = await sbExec(cmd, 110000);
-      return res.json({ ok: true, stdout: (out.stdout + out.stderr).slice(0, 5000), stderr: '', code: out.code, timeMs: Date.now() - t0, lang: 'install', engine: 'silelo' });
+      const out = await sbExec(cmd, 115000);
+      return res.json({ ok: true, stdout: (out.stdout + out.stderr).slice(0, 5000), stderr: '', code: out.code, timeMs: Date.now() - t0, lang: 'install:' + mgr, engine: 'silelo' });
     }
 
     /* 2) auto-install: import อะไรที่ยังไม่มี → pip install ให้อัตโนมัติ (ครั้งแรก) */
@@ -1088,8 +1101,22 @@ app.post('/api/run', async (req, res) => {
       }
     }
 
-    /* 3) รัน */
-    let cmd = null, args = [], runCwd = null;
+    /* 3) auto-install compiler ตามภาษา (ครั้งแรก) */
+    const TOOL_PKGS = { java: 'default-jdk-headless', c: 'gcc', cpp: 'g++', go: 'golang-go', rust: 'rustc', ruby: 'ruby', php: 'php-cli' };
+    const TOOL_BINS = { java: ['javac', 'java'], c: ['gcc'], cpp: ['g++'], go: ['go'], rust: ['rustc'], ruby: ['ruby'], php: ['php'] };
+    if (TOOL_BINS[l]) {
+      for (const b of TOOL_BINS[l]) {
+        const chk = await sbExec('which ' + b + ' 2>/dev/null || true', 6000);
+        if (!chk.stdout.trim()) {
+          await sbExec('apt-get update -qq 2>&1 | tail -1', 60000);
+          await sbExec('apt-get install -y ' + TOOL_PKGS[l] + ' 2>&1 | tail -4', 115000);
+          break;
+        }
+      }
+    }
+
+    /* 4) รัน */
+    let cmd = null, args = [], runCwd = null, pre = null;
     if (l === 'python') {
       runCwd = fs.mkdtempSync(require('path').join(require('os').tmpdir(), 'sirun-'));
       fs.writeFileSync(require('path').join(runCwd, 'main.py'), src);
@@ -1097,10 +1124,51 @@ app.post('/api/run', async (req, res) => {
     }
     else if (l === 'javascript') { cmd = 'node'; args = ['-e', src]; }
     else if (l === 'bash') { cmd = 'bash'; args = ['-c', src]; }
-    else return res.status(400).json({ ok: false, error: 'silelo runner รองรับ python / javascript / bash' });
+    else if (l === 'java') {
+      runCwd = fs.mkdtempSync(require('path').join(require('os').tmpdir(), 'sirun-'));
+      fs.writeFileSync(require('path').join(runCwd, 'Main.java'), src);
+      pre = 'javac Main.java'; cmd = 'java'; args = ['Main'];
+    }
+    else if (l === 'c') {
+      runCwd = fs.mkdtempSync(require('path').join(require('os').tmpdir(), 'sirun-'));
+      fs.writeFileSync(require('path').join(runCwd, 'main.c'), src);
+      pre = 'gcc main.c -o main -O2'; cmd = './main'; args = [];
+    }
+    else if (l === 'cpp') {
+      runCwd = fs.mkdtempSync(require('path').join(require('os').tmpdir(), 'sirun-'));
+      fs.writeFileSync(require('path').join(runCwd, 'main.cpp'), src);
+      pre = 'g++ main.cpp -o main -O2'; cmd = './main'; args = [];
+    }
+    else if (l === 'go') {
+      runCwd = fs.mkdtempSync(require('path').join(require('os').tmpdir(), 'sirun-'));
+      fs.writeFileSync(require('path').join(runCwd, 'main.go'), src);
+      cmd = 'go'; args = ['run', 'main.go'];
+    }
+    else if (l === 'rust') {
+      runCwd = fs.mkdtempSync(require('path').join(require('os').tmpdir(), 'sirun-'));
+      fs.writeFileSync(require('path').join(runCwd, 'main.rs'), src);
+      pre = 'rustc main.rs -O -o main'; cmd = './main'; args = [];
+    }
+    else if (l === 'ruby') {
+      runCwd = fs.mkdtempSync(require('path').join(require('os').tmpdir(), 'sirun-'));
+      fs.writeFileSync(require('path').join(runCwd, 'main.rb'), src);
+      cmd = 'ruby'; args = ['main.rb'];
+    }
+    else if (l === 'php') {
+      runCwd = fs.mkdtempSync(require('path').join(require('os').tmpdir(), 'sirun-'));
+      fs.writeFileSync(require('path').join(runCwd, 'main.php'), src);
+      cmd = 'php'; args = ['main.php'];
+    }
+    else return res.status(400).json({ ok: false, error: 'silelo runner รองรับ python / javascript / bash / java / c / cpp / go / rust / ruby / php' });
 
     const { spawn } = require('child_process');
     let stdout = '', stderr = '', exitCode = -1;
+    if (pre) {
+      const po = await sbExec(pre, 60000);
+      if (po.code !== 0) {
+        return res.json({ ok: true, stdout: '', stderr: (po.stdout + po.stderr).slice(0, 4000), code: po.code, timeMs: Date.now() - t0, lang: l, engine: 'silelo' });
+      }
+    }
     try {
       const out = await new Promise((resolve, reject) => {
         const cp = spawn(cmd, args, { cwd: runCwd || undefined, env: Object.assign({}, process.env, { PATH: (process.env.PATH || '/usr/local/bin:/usr/bin:/bin') + ':/usr/local/bin' }), stdio: ['ignore', 'pipe', 'pipe'] });
