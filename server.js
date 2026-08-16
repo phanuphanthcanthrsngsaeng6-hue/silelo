@@ -1016,96 +1016,6 @@ app.get('/line-tts/:name', (req, res) => {
   fs.createReadStream(f).on('close', () => { setTimeout(() => { try { fs.unlinkSync(f); } catch (e) {} }, 300000); }).pipe(res);
 });
 
-app.use((req, res) => res.status(404).json({ ok: false, error: 'ไม่พบเส้นทางที่ขอ' }));
-
-/* ================== 🤖 สลี๋บอท ประจำแชททีมงาน ================== */
-const BOT_ID = 'sali-bot';
-const BOT_NAME = 'สลี๋บอท';
-const botCooldown = new Map(); // userId -> last reply time
-
-function shouldBotReply(text) {
-  const t = String(text || '').trim().toLowerCase();
-  if (t.includes('@sali') || t.includes('@bot') || t.includes('@สลี๋')) return true;
-  if (/[?？]$/.test(t)) return true;
-  return /(ไหม|มั้ย|ยังไง|อย่างไร|เท่าไหร่|เท่าไร|กี่บาท|ไหน|ได้ไหม|ช่วย|ช่วยหน่อย|แนะนำ|อธิบาย|สรุป|แจ้ง)/.test(t);
-}
-
-function botCooldownOk(userId) {
-  const last = botCooldown.get(userId) || 0;
-  if (Date.now() - last < 20000) return false;
-  botCooldown.set(userId, Date.now());
-  return true;
-}
-
-async function saliBotReply(user, triggerText) {
-  const history = db.messages.slice(-16).map(m => ({
-    role: m.userId === BOT_ID ? 'assistant' : 'user',
-    content: (m.userId === BOT_ID ? 'สลี๋บอท: ' : (m.user + ': ')) + m.text
-  }));
-  try {
-    broadcast({ type: 'bot-typing' });
-    const result = await askAI(user, triggerText, history);
-    const reply = (result && result.reply) || aiMockReply(triggerText);
-    const msg = { id: crypto.randomUUID(), user: BOT_NAME, userId: BOT_ID, text: String(reply).slice(0, 500), time: Date.now(), bot: true };
-    db.messages.push(msg);
-    saveDB(db);
-    broadcast({ type: 'message', message: msg });
-  } catch (e) {
-    console.error('🤖 สลี๋บอท error:', e.message);
-  } finally {
-    broadcast({ type: 'bot-done' });
-  }
-}
-
-function maybeBotReply(user, text) {
-  if (!user || user.id === BOT_ID) return;
-  if (!shouldBotReply(text)) return;
-  if (!botCooldownOk(user.id)) return;
-  saliBotReply(user, text);
-}
-
-/* ================== HTTP + WEBSOCKET SERVER ================== */
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
-
-function broadcast(data) {
-  const str = JSON.stringify(data);
-  wss.clients.forEach(c => { if (c.readyState === 1) c.send(str); });
-}
-
-wss.on('connection', (ws) => {
-  ws.isAlive = true;
-  ws.on('pong', () => { ws.isAlive = true; });
-  ws.send(JSON.stringify({ type: 'welcome', message: 'เชื่อมต่อเรียลไทม์สำเร็จ ✅', online: wss.clients.size, bot: true }));
-  ws.on('message', (raw) => {
-    try {
-      const data = JSON.parse(raw);
-      if (data.type === 'ping') { ws.send(JSON.stringify({ type: 'pong' })); return; }
-      if (data.type === 'message' && data.token && data.text) {
-        try {
-          const payload = jwt.verify(data.token, JWT_SECRET);
-          const user = db.users.find(u => u.id === payload.id);
-          if (!user) return;
-          const msg = { id: crypto.randomUUID(), user: user.name, userId: user.id, text: data.text.trim().slice(0, 500), time: Date.now() };
-          db.messages.push(msg);
-          saveDB(db);
-          broadcast({ type: 'message', message: msg });
-          maybeBotReply(user, msg.text);
-        } catch (e) { /* invalid token */ }
-      }
-    } catch (e) { /* ignore */ }
-  });
-});
-
-const interval = setInterval(() => {
-  wss.clients.forEach(ws => {
-    if (!ws.isAlive) return ws.terminate();
-    ws.isAlive = false;
-    ws.ping();
-  });
-}, 30000);
-wss.on('close', () => clearInterval(interval));
-
 /* ================== 🧪 LAB RUNNER (รันโค้ด + ติดตั้ง package จริง) ================== */
 /* ใช้โดย SILELO Neo-Connect (Vercel) — ผ่าน secret เพื่อความปลอดภัย */
 const RUN_SECRET = (process.env.RUN_SECRET || '').trim();
@@ -1215,6 +1125,97 @@ if (SELF_URL) {
   setInterval(() => { fetch(SELF_URL + '/api/health').catch(() => {}); }, 4 * 60 * 1000).unref();
   console.log('🔄 self-ping กัน sleep: ' + SELF_URL);
 }
+
+
+app.use((req, res) => res.status(404).json({ ok: false, error: 'ไม่พบเส้นทางที่ขอ' }));
+
+/* ================== 🤖 สลี๋บอท ประจำแชททีมงาน ================== */
+const BOT_ID = 'sali-bot';
+const BOT_NAME = 'สลี๋บอท';
+const botCooldown = new Map(); // userId -> last reply time
+
+function shouldBotReply(text) {
+  const t = String(text || '').trim().toLowerCase();
+  if (t.includes('@sali') || t.includes('@bot') || t.includes('@สลี๋')) return true;
+  if (/[?？]$/.test(t)) return true;
+  return /(ไหม|มั้ย|ยังไง|อย่างไร|เท่าไหร่|เท่าไร|กี่บาท|ไหน|ได้ไหม|ช่วย|ช่วยหน่อย|แนะนำ|อธิบาย|สรุป|แจ้ง)/.test(t);
+}
+
+function botCooldownOk(userId) {
+  const last = botCooldown.get(userId) || 0;
+  if (Date.now() - last < 20000) return false;
+  botCooldown.set(userId, Date.now());
+  return true;
+}
+
+async function saliBotReply(user, triggerText) {
+  const history = db.messages.slice(-16).map(m => ({
+    role: m.userId === BOT_ID ? 'assistant' : 'user',
+    content: (m.userId === BOT_ID ? 'สลี๋บอท: ' : (m.user + ': ')) + m.text
+  }));
+  try {
+    broadcast({ type: 'bot-typing' });
+    const result = await askAI(user, triggerText, history);
+    const reply = (result && result.reply) || aiMockReply(triggerText);
+    const msg = { id: crypto.randomUUID(), user: BOT_NAME, userId: BOT_ID, text: String(reply).slice(0, 500), time: Date.now(), bot: true };
+    db.messages.push(msg);
+    saveDB(db);
+    broadcast({ type: 'message', message: msg });
+  } catch (e) {
+    console.error('🤖 สลี๋บอท error:', e.message);
+  } finally {
+    broadcast({ type: 'bot-done' });
+  }
+}
+
+function maybeBotReply(user, text) {
+  if (!user || user.id === BOT_ID) return;
+  if (!shouldBotReply(text)) return;
+  if (!botCooldownOk(user.id)) return;
+  saliBotReply(user, text);
+}
+
+/* ================== HTTP + WEBSOCKET SERVER ================== */
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server });
+
+function broadcast(data) {
+  const str = JSON.stringify(data);
+  wss.clients.forEach(c => { if (c.readyState === 1) c.send(str); });
+}
+
+wss.on('connection', (ws) => {
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
+  ws.send(JSON.stringify({ type: 'welcome', message: 'เชื่อมต่อเรียลไทม์สำเร็จ ✅', online: wss.clients.size, bot: true }));
+  ws.on('message', (raw) => {
+    try {
+      const data = JSON.parse(raw);
+      if (data.type === 'ping') { ws.send(JSON.stringify({ type: 'pong' })); return; }
+      if (data.type === 'message' && data.token && data.text) {
+        try {
+          const payload = jwt.verify(data.token, JWT_SECRET);
+          const user = db.users.find(u => u.id === payload.id);
+          if (!user) return;
+          const msg = { id: crypto.randomUUID(), user: user.name, userId: user.id, text: data.text.trim().slice(0, 500), time: Date.now() };
+          db.messages.push(msg);
+          saveDB(db);
+          broadcast({ type: 'message', message: msg });
+          maybeBotReply(user, msg.text);
+        } catch (e) { /* invalid token */ }
+      }
+    } catch (e) { /* ignore */ }
+  });
+});
+
+const interval = setInterval(() => {
+  wss.clients.forEach(ws => {
+    if (!ws.isAlive) return ws.terminate();
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 30000);
+wss.on('close', () => clearInterval(interval));
 
 server.listen(PORT, '0.0.0.0', () => {
   console.log('🚀 Silelo server พร้อมใช้งานที่ http://0.0.0.0:' + PORT);
