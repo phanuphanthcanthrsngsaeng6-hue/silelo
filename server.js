@@ -1106,6 +1106,116 @@ const interval = setInterval(() => {
 }, 30000);
 wss.on('close', () => clearInterval(interval));
 
+/* ================== 🧪 LAB RUNNER (รันโค้ด + ติดตั้ง package จริง) ================== */
+/* ใช้โดย SILELO Neo-Connect (Vercel) — ผ่าน secret เพื่อความปลอดภัย */
+const RUN_SECRET = (process.env.RUN_SECRET || '').trim();
+const { exec: _sbExec } = require('child_process');
+function sbExec(cmd, timeoutMs) {
+  return new Promise((resolve) => {
+    _sbExec(String(cmd), {
+      timeout: timeoutMs || 15000, maxBuffer: 4 * 1024 * 1024,
+      env: Object.assign({}, process.env, { PATH: (process.env.PATH || '/usr/local/bin:/usr/bin:/bin') + ':/usr/local/bin' })
+    }, (err, stdout, stderr) => {
+      let code = 0;
+      if (err) code = err.code === null ? 124 : (typeof err.code === 'number' ? err.code : 1);
+      resolve({ code, stdout: String(stdout || ''), stderr: String(stderr || '') });
+    });
+  });
+}
+async function ensurePip() {
+  const chk = await sbExec('python3 -m pip --version 2>&1 | head -1', 8000);
+  if (chk.code === 0) return true;
+  await sbExec('python3 -m ensurepip --upgrade 2>&1 | tail -3', 30000);
+  const chk2 = await sbExec('python3 -m pip --version 2>&1 | head -1', 8000);
+  return chk2.code === 0;
+}
+const PY_STDLIB = new Set(['sys','os','json','math','random','time','datetime','re','collections','itertools','functools','pathlib','subprocess','io','typing','abc','hashlib','base64','string','textwrap','decimal','fractions','statistics','uuid','argparse','logging','socket','threading','multiprocessing','queue','asyncio','select','signal','tempfile','glob','shutil','zipfile','tarfile','gzip','csv','sqlite3','xml','html','http','urllib','email','unittest','pdb','traceback','warnings','contextlib','dataclasses','enum','copy','pprint','array','bisect','calendar','cmath','concurrent','cProfile','ctypes','dis','gc','heapq','inspect','keyword','linecache','locale','marshal','mmap','operator','optparse','pickle','platform','pstats','resource','sched','shelve','site','struct','symtable','sysconfig','tabnanny','turtle','types','unicodedata','venv','weakref','webbrowser','zipapp','zoneinfo','builtins','__future__','antigravity','secrets','stat','fnmatch','getpass','gettext','graphlib']);
+app.post('/api/run', async (req, res) => {
+  try {
+    const secret = String(req.headers['x-run-secret'] || req.body?.secret || '');
+    if (!RUN_SECRET || secret !== RUN_SECRET) return res.status(401).json({ ok: false, error: 'unauthorized' });
+    const { code, lang, install } = req.body || {};
+    const src = String(code || '').slice(0, 20000);
+    if (!src.trim()) return res.status(400).json({ ok: false, error: 'โค้ดว่างเปล่า' });
+    let l = String(lang || 'python').toLowerCase();
+    if (l === 'js' || l === 'node') l = 'javascript';
+    if (l === 'sh' || l === 'shell') l = 'bash';
+    if (l === 'py') l = 'python';
+    const t0 = Date.now();
+
+    /* 1) ติดตั้งโดยตรง: pip install / npm install */
+    if (install || /^\s*(?:pip|pip3|python3?\s+-m\s+pip)\s+(?:install|uninstall)\s+/.test(src) || /^\s*(?:npm|npx)\s+install\s+/.test(src)) {
+      let pkgs = src.trim();
+      let cmd;
+      if (/(?:npm|npx)\s+install/.test(pkgs)) {
+        pkgs = pkgs.replace(/^\s*(?:npm|npx)\s+install\s*/, '');
+        cmd = 'cd ' + JSON.stringify(process.env.HOME || '/tmp') + ' && npm install ' + pkgs.split(/\s+/).filter(x => !x.startsWith('-') && x !== 'install').join(' ') + ' --no-audit --no-fund 2>&1 | tail -12';
+      } else {
+        pkgs = pkgs.replace(/^\s*(?:pip|pip3|python3?\s+-m\s+pip)\s+(?:install|uninstall)\s*/, '');
+        const action = /uninstall/.test(src) ? 'uninstall -y' : 'install --quiet';
+        const ok = await ensurePip();
+        if (!ok) return res.status(500).json({ ok: false, error: 'ไม่มี pip บนเครื่อง' });
+        cmd = 'python3 -m pip ' + action + ' ' + pkgs.split(/\s+/).filter(x => !x.startsWith('-') && x !== 'install' && x !== 'uninstall').join(' ') + ' 2>&1 | tail -12';
+      }
+      const out = await sbExec(cmd, 110000);
+      return res.json({ ok: true, stdout: (out.stdout + out.stderr).slice(0, 5000), stderr: '', code: out.code, timeMs: Date.now() - t0, lang: 'install', engine: 'silelo' });
+    }
+
+    /* 2) auto-install: import อะไรที่ยังไม่มี → pip install ให้อัตโนมัติ (ครั้งแรก) */
+    let autoInstalled = [];
+    if (l === 'python') {
+      const imports = [...src.matchAll(/^\s*(?:import|from)\s+([a-zA-Z_][a-zA-Z0-9_]*)/gm)].map(m => m[1]);
+      const missing = [...new Set(imports.filter(p => !PY_STDLIB.has(p)))];
+      for (const p of missing) {
+        const chk = await sbExec('python3 -c "import ' + p + '" 2>&1', 8000);
+        if (chk.code !== 0) {
+          const ok = await ensurePip();
+          if (ok) {
+            await sbExec('python3 -m pip install --quiet ' + p + ' 2>&1 | tail -3', 90000);
+            autoInstalled.push(p);
+          }
+        }
+      }
+    }
+
+    /* 3) รัน */
+    let cmd = null, args = [];
+    if (l === 'python') { cmd = 'python3'; args = ['-u', '-']; }
+    else if (l === 'javascript') { cmd = 'node'; args = ['-e', src]; }
+    else if (l === 'bash') { cmd = 'bash'; args = ['-c', src]; }
+    else return res.status(400).json({ ok: false, error: 'silelo runner รองรับ python / javascript / bash' });
+
+    const { spawn } = require('child_process');
+    let stdout = '', stderr = '', exitCode = -1;
+    try {
+      const out = await new Promise((resolve, reject) => {
+        const cp = spawn(cmd, args, { env: Object.assign({}, process.env, { PATH: (process.env.PATH || '/usr/local/bin:/usr/bin:/bin') + ':/usr/local/bin' }), stdio: ['ignore', 'pipe', 'pipe'] });
+        let o = '', e = '';
+        cp.stdout.on('data', d => { o += d.toString(); if (o.length > 60000) { try { cp.kill('SIGKILL'); } catch (x) {} } });
+        cp.stderr.on('data', d => { e += d.toString(); if (e.length > 60000) { try { cp.kill('SIGKILL'); } catch (x) {} } });
+        cp.on('error', err => reject(err));
+        cp.on('close', code => resolve({ o, e, code }));
+        setTimeout(() => { try { cp.kill('SIGKILL'); } catch (x) {} reject(new Error('__timeout__')); }, 25000);
+      });
+      stdout = out.o; stderr = out.e; exitCode = out.code;
+    } catch (err) {
+      if (err.message === '__timeout__') { stderr = '⏱️ เกินเวลา 25 วิ'; exitCode = 124; }
+      else { stderr = 'เกิดข้อผิดพลาด: ' + err.message; exitCode = 1; }
+    }
+    if (autoInstalled.length) stdout = '📦 ติดตั้งอัตโนมัติ: ' + autoInstalled.join(', ') + '\n' + stdout;
+    return res.json({ ok: true, stdout: stdout.slice(0, 60000), stderr: stderr.slice(0, 60000), code: exitCode, timeMs: Date.now() - t0, lang: l, engine: 'silelo' });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: 'run error: ' + e.message });
+  }
+});
+
+/* กัน Render sleep — self-ping ทุก 4 นาที (ถ้า SELF_URL ตั้งไว้) */
+const SELF_URL = process.env.SELF_URL || '';
+if (SELF_URL) {
+  setInterval(() => { fetch(SELF_URL + '/api/health').catch(() => {}); }, 4 * 60 * 1000).unref();
+  console.log('🔄 self-ping กัน sleep: ' + SELF_URL);
+}
+
 server.listen(PORT, '0.0.0.0', () => {
   console.log('🚀 Silelo server พร้อมใช้งานที่ http://0.0.0.0:' + PORT);
   // 💾 ดึงความจำของสลี่กลับมาจาก Gist (ไม่ลืมแม้ redeploy)
