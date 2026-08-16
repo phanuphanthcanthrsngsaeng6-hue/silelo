@@ -1127,7 +1127,7 @@ app.post('/api/run', async (req, res) => {
     else if (l === 'java') {
       runCwd = fs.mkdtempSync(require('path').join(require('os').tmpdir(), 'sirun-'));
       fs.writeFileSync(require('path').join(runCwd, 'Main.java'), src);
-      pre = 'javac Main.java'; cmd = 'java'; args = ['Main'];
+      pre = 'javac -encoding UTF-8 Main.java'; cmd = 'java'; args = ['Main'];
     }
     else if (l === 'c') {
       runCwd = fs.mkdtempSync(require('path').join(require('os').tmpdir(), 'sirun-'));
