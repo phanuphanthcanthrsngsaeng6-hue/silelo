@@ -224,7 +224,7 @@ app.get('/api/me', auth, (req, res) => res.json({ ok: true, user: publicUser(req
 //    ข้อมูลโปรเจกต์ฝังใน system prompt เพื่อให้ตอบเรื่อง Silelo ได้
 const OPENROUTER_TEXT_MODELS = (process.env.OPENROUTER_TEXT_MODELS || 'nvidia/nemotron-3-ultra-550b-a55b:free,google/gemma-4-26b-a4b-it:free').split(',').map(s => s.trim()).filter(Boolean);
 /* 🤖 โมเดลเขียนโค้ด (CODER AGENT) — Qwen3-Coder ดีสุดฟรี, Kimi K2.6 all-around, fallback gpt-oss-120b */
-const CODER_MODELS = (process.env.CODER_MODELS || 'qwen/qwen3-coder:free,moonshotai/kimi-k2.6:free,openai/gpt-oss-120b:free').split(',').map(s => s.trim()).filter(Boolean);
+const CODER_MODELS = (process.env.CODER_MODELS || 'cohere/north-mini-code:free,poolside/laguna-xs-2.1:free,z-ai/glm-5.2:free,dots-studio/dots-3-note-preview:free,nvidia/nemotron-3.5-lightning:free').split(',').map(s => s.trim()).filter(Boolean);
 async function coderChat(messages, extSignal) {
   if (!OPENROUTER_KEYS.length) return null;
   let lastErr = null;
