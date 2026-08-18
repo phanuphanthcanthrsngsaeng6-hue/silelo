@@ -246,6 +246,17 @@ async function coderChat(messages, extSignal) {
       } catch (e) { if (extSignal && extSignal.aborted) return null; lastErr = e.message; } finally { rs.clear(); }
     }
   }
+  /* fallback: HF DeepSeek-V4-Flash (ฟรี, ทำงานตลอด) */
+  try {
+    const r = await fetch('http://localhost:' + PORT + '/api/hf-chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-run-secret': RUN_SECRET },
+      body: JSON.stringify({ messages: messages.map(m => ({ role: m.role, content: m.content + '\n\nตอบเป็น JSON เท่านั้น: {"lang":"...","code":"..."}' })), model: 'deepseek-ai/DeepSeek-V4-Flash' }),
+      signal: AbortSignal.timeout(25000)
+    });
+    const j = await r.json();
+    if (j && j.ok && j.reply) return { provider: 'huggingface', model: j.model, reply: j.reply };
+  } catch (e) { }
   /* fallback: Groq gpt-oss-120b (เร็ว ไม่มี key OpenRouter) */
   try {
     const r = await groqChat([...messages.map(m => ({ role: m.role, content: m.content + '\n\nตอบเป็น JSON เท่านั้น: {"lang":"...","code":"..."}' }))], extSignal);
