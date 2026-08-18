@@ -1323,7 +1323,7 @@ app.post('/api/hf-chat', async (req, res) => {
     if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ ok: false, error: 'no messages' });
     const HF_KEYS = (process.env.HF_TOKEN || '').split(/[,;.\n]/).map(s => s.trim()).filter(s => s.startsWith('hf_'));
     if (!HF_KEYS.length) return res.status(400).json({ ok: false, error: 'no hf token' });
-    const models = [String(model || ''), 'deepseek-ai/DeepSeek-V4-Flash', 'deepseek-ai/DeepSeek-V4-Pro', 'zai-org/GLM-5.2', 'tencent/Hy3', 'moonshotai/Kimi-K3', 'Qwen/Qwen2.5-72B-Instruct', 'Qwen/Qwen3.6-27B'].filter(Boolean);
+    const models = [String(model || ''), 'deepseek-ai/DeepSeek-V4-Flash', 'deepseek-ai/DeepSeek-V4-Pro', 'openai/gpt-oss-20b', 'zai-org/GLM-5.2', 'tencent/Hy3', 'moonshotai/Kimi-K3', 'Qwen/Qwen2.5-72B-Instruct', 'Qwen/Qwen3.6-27B'].filter(Boolean);
     for (const m of models) {
       for (const key of HF_KEYS) {
         try {
