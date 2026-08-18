@@ -1279,6 +1279,35 @@ app.post('/api/agent', async (req, res) => {
   return res.json({ ok: false, code, lang, error: lastErr.slice(0, 1500), attempts: Math.min(attempts, 3), model: modelUsed, timeMs: Date.now() - t0 });
 });
 
+// 🤗 HF proxy — ให้ Neo-Connect (Vercel) เรียก HF ผ่าน silelo (Render) เพราะ Vercel ไป router.huggingface.co ไม่ได้
+app.post('/api/hf-chat', async (req, res) => {
+  try {
+    const secret = String(req.headers['x-run-secret'] || req.body?.secret || '');
+    if (!RUN_SECRET || secret !== RUN_SECRET) return res.status(401).json({ ok: false, error: 'unauthorized' });
+    const { messages, model } = req.body || {};
+    if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ ok: false, error: 'no messages' });
+    const HF_TOKEN = (process.env.HF_TOKEN || '').trim();
+    if (!HF_TOKEN) return res.status(400).json({ ok: false, error: 'no hf token' });
+    const models = [String(model || ''), 'deepseek-ai/DeepSeek-V4-Flash', 'Qwen/Qwen2.5-72B-Instruct', 'Qwen/Qwen3.6-27B'].filter(Boolean);
+    for (const m of models) {
+      try {
+        const r = await fetch('https://router.huggingface.co/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + HF_TOKEN, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model: m, max_tokens: 900, messages, chat_template_kwargs: { enable_thinking: false } }),
+          signal: AbortSignal.timeout ? AbortSignal.timeout(22000) : undefined
+        });
+        if (!r.ok) continue;
+        const j = await r.json();
+        const reply = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+        if (reply && String(reply).trim()) return res.json({ ok: true, model: m, reply });
+      } catch (e) { /* try next */ }
+    }
+    return res.status(502).json({ ok: false, error: 'hf unavailable' });
+  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+
+
 app.use((req, res) => res.status(404).json({ ok: false, error: 'ไม่พบเส้นทางที่ขอ' }));
 
 /* ================== 🤖 สลี๋บอท ประจำแชททีมงาน ================== */
