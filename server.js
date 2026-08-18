@@ -230,8 +230,8 @@ async function coderChat(messages, extSignal) {
   let lastErr = null;
   for (const key of OPENROUTER_KEYS) {
     for (const model of CODER_MODELS) {
+      const rs = raceSignal(15000, extSignal);
       try {
-        const rs = raceSignal(15000, extSignal);
         const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://silelo.app', 'X-Title': 'Silelo' },
@@ -398,8 +398,8 @@ async function openrouterChat(messages, extSignal) {
   let lastErr = null;
   for (const key of OPENROUTER_KEYS) {
     for (const model of OPENROUTER_TEXT_MODELS) {
+      const rs = raceSignal(8000, extSignal); // ⏱️ timeout สั้น 8 วิ — ไม่ให้ OpenRouter ขวางความเร็ว
       try {
-        const rs = raceSignal(8000, extSignal); // ⏱️ timeout สั้น 8 วิ — ไม่ให้ OpenRouter ขวางความเร็ว
         const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
           method: 'POST',
           headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://silelo.app', 'X-Title': 'Silelo' },
@@ -1276,7 +1276,7 @@ app.post('/api/agent', async (req, res) => {
       lastErr = String((jj && (jj.stderr || jj.stdout)) || 'run failed').slice(0, 1200);
     } catch (e) { lastErr = 'run error: ' + e.message; }
   }
-  return res.json({ ok: false, code, lang, error: lastErr.slice(0, 1500), attempts, model: modelUsed, timeMs: Date.now() - t0 });
+  return res.json({ ok: false, code, lang, error: lastErr.slice(0, 1500), attempts: Math.min(attempts, 3), model: modelUsed, timeMs: Date.now() - t0 });
 });
 
 app.use((req, res) => res.status(404).json({ ok: false, error: 'ไม่พบเส้นทางที่ขอ' }));
