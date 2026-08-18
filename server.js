@@ -223,6 +223,36 @@ app.get('/api/me', auth, (req, res) => res.json({ ok: true, user: publicUser(req
 // 🔌 ใช้ OpenRouter โมเดลฟรี (:free) ตอบคำถามจริง — ไม่เสียเงิน
 //    ข้อมูลโปรเจกต์ฝังใน system prompt เพื่อให้ตอบเรื่อง Silelo ได้
 const OPENROUTER_TEXT_MODELS = (process.env.OPENROUTER_TEXT_MODELS || 'nvidia/nemotron-3-ultra-550b-a55b:free,google/gemma-4-26b-a4b-it:free').split(',').map(s => s.trim()).filter(Boolean);
+/* 🤖 โมเดลเขียนโค้ด (CODER AGENT) — Qwen3-Coder ดีสุดฟรี, Kimi K2.6 all-around, fallback gpt-oss-120b */
+const CODER_MODELS = (process.env.CODER_MODELS || 'qwen/qwen3-coder:free,moonshotai/kimi-k2.6:free,openai/gpt-oss-120b:free').split(',').map(s => s.trim()).filter(Boolean);
+async function coderChat(messages, extSignal) {
+  if (!OPENROUTER_KEYS.length) return null;
+  let lastErr = null;
+  for (const key of OPENROUTER_KEYS) {
+    for (const model of CODER_MODELS) {
+      try {
+        const rs = raceSignal(15000, extSignal);
+        const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://silelo.app', 'X-Title': 'Silelo' },
+          body: JSON.stringify({ model, max_tokens: 2000, messages }),
+          signal: rs.signal
+        });
+        rs.clear();
+        const j = await r.json();
+        if (!r.ok) throw new Error('OR ' + r.status);
+        const reply = j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content;
+        if (reply) return { provider: 'openrouter', model, reply };
+      } catch (e) { if (extSignal && extSignal.aborted) return null; lastErr = e.message; } finally { rs.clear(); }
+    }
+  }
+  /* fallback: Groq gpt-oss-120b (เร็ว ไม่มี key OpenRouter) */
+  try {
+    const r = await groqChat([...messages.map(m => ({ role: m.role, content: m.content + '\n\nตอบเป็น JSON เท่านั้น: {"lang":"...","code":"..."}' }))], extSignal);
+    if (r && r.reply) return { provider: 'groq', model: r.model, reply: r.reply };
+  } catch (e) {}
+  return null;
+}
 const AI_OWNER_EMAIL = (process.env.AI_OWNER_EMAIL || 'demo@silelo.app').toLowerCase();
 
 /* ================== 🎭 บุคลิกของสลี๋ (Personas) ================== */
@@ -324,7 +354,7 @@ function aiMockReply(q) {
 }
 
 // 🏆 Groq — โมเดลฟรีตัวหลักของสลี่ (gpt-oss-120b = OpenAI โอเพนซอร์ส 120B ตอบไทยดี เร็ว ไม่มีค่าใช้จ่าย)
-const GROQ_MODELS = (process.env.GROQ_MODELS || 'openai/gpt-oss-120b,llama-3.3-70b-versatile,qwen/qwen3.6-27b,openai/gpt-oss-20b,groq/compound-mini,llama-3.1-8b-instant').split(',').map(s => s.trim()).filter(Boolean);
+const GROQ_MODELS = (process.env.GROQ_MODELS || 'openai/gpt-oss-120b,qwen/qwen3.6-27b,openai/gpt-oss-20b,groq/compound-mini').split(',').map(s => s.trim()).filter(Boolean);
 async function groqChat(messages, extSignal) {
   if (!GROQ_API_KEY) { logAI('groq', 'no key'); return null; }
   for (const model of GROQ_MODELS) {
@@ -1198,6 +1228,56 @@ if (SELF_URL) {
   console.log('🔄 self-ping กัน sleep: ' + SELF_URL);
 }
 
+
+
+/* ================== 🤖 CODER AGENT — เขียนโค้ด + รัน + แก้บั๊กเอง อัตโนมัติ ================== */
+function extractCodeJson(reply) {
+  if (!reply) return null;
+  let t = String(reply);
+  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) t = fence[1];
+  const obj = t.match(/\{[\s\S]*?\}/);
+  if (!obj) return null;
+  try {
+    const j = JSON.parse(obj[0]);
+    if (j && j.code) return { lang: String(j.lang || 'python').toLowerCase(), code: String(j.code) };
+  } catch (e) {}
+  return null;
+}
+
+app.post('/api/agent', async (req, res) => {
+  const secret = String(req.headers['x-run-secret'] || req.body?.secret || '');
+  if (!RUN_SECRET || secret !== RUN_SECRET) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  const prompt = String(req.body?.prompt || '').slice(0, 3000);
+  if (!prompt.trim()) return res.status(400).json({ ok: false, error: 'prompt ว่าง' });
+  const SYS = 'คุณคือโค้ดเอเจนต์ของ "สลี่" ผู้ช่วย AI ตอบเป็น JSON เท่านั้น ไม่มีข้อความอื่น: {"lang": "python|javascript|bash|java|c|cpp|go|rust|typescript|ruby|php", "code": "โค้ดเต็ม"} เขียนโค้ดให้สมบูรณ์ รันได้ทันที อ่าน stdin ไม่ได้ ไม่ต้องรอ input ภาษาไทยในโค้ดได้';
+  const t0 = Date.now();
+  let code = '', lang = 'python', lastErr = '', attempts = 0, modelUsed = '';
+  for (attempts = 1; attempts <= 3; attempts++) {
+    const userMsg = attempts === 1 ? prompt : prompt + '\n\n⚠️ โค้ดก่อนหน้าของคุณรันไม่ผ่าน: ' + lastErr + '\n\nแก้ไขโค้ดให้ถูกต้อง คืน JSON {"lang":"...","code":"..."} เท่านั้น';
+    const r = await coderChat([{ role: 'system', content: SYS }, { role: 'user', content: userMsg }]);
+    if (!r || !r.reply) { lastErr = 'AI ไม่ตอบ (provider ล่ม)'; continue; }
+    modelUsed = (r.provider || '') + '/' + (r.model || '');
+    const parsed = extractCodeJson(r.reply);
+    if (!parsed) { lastErr = 'AI ไม่คืน JSON ที่ถูกต้อง: ' + String(r.reply).slice(0, 300); continue; }
+    code = parsed.code; lang = parsed.lang;
+    if (code.length > 18000) { lastErr = 'โค้ดยาวเกิน 18000 ตัว'; continue; }
+    // รันผ่าน /api/run ของตัวเอง (มี auto-install import + compiler)
+    try {
+      const rr = await fetch('http://localhost:' + PORT + '/api/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-run-secret': RUN_SECRET },
+        body: JSON.stringify({ code, lang }), signal: AbortSignal.timeout(30000)
+      });
+      const jj = await rr.json();
+      if (jj && jj.ok && !jj.stderr && (jj.code === 0 || jj.code === undefined || jj.code === null)) {
+        return res.json({ ok: true, code, lang, stdout: (jj.stdout || '').slice(0, 4000), stderr: '', exitCode: jj.code || 0, timeMs: Date.now() - t0, attempts, model: modelUsed, engine: 'silelo-agent' });
+      }
+      lastErr = String((jj && (jj.stderr || jj.stdout)) || 'run failed').slice(0, 1200);
+    } catch (e) { lastErr = 'run error: ' + e.message; }
+  }
+  return res.json({ ok: false, code, lang, error: lastErr.slice(0, 1500), attempts, model: modelUsed, timeMs: Date.now() - t0 });
+});
 
 app.use((req, res) => res.status(404).json({ ok: false, error: 'ไม่พบเส้นทางที่ขอ' }));
 
