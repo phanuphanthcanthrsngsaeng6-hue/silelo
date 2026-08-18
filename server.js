@@ -1244,15 +1244,39 @@ if (SELF_URL) {
 /* ================== 🤖 CODER AGENT — เขียนโค้ด + รัน + แก้บั๊กเอง อัตโนมัติ ================== */
 function extractCodeJson(reply) {
   if (!reply) return null;
-  let t = String(reply);
+  let t = String(reply).trim();
   const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fence) t = fence[1];
-  const obj = t.match(/\{[\s\S]*?\}/);
-  if (!obj) return null;
+  if (fence) t = fence[1].trim();
+  // 1) ลอง parse ตรง ๆ
   try {
-    const j = JSON.parse(obj[0]);
+    const j = JSON.parse(t);
     if (j && j.code) return { lang: String(j.lang || 'python').toLowerCase(), code: String(j.code) };
-  } catch (e) {}
+  } catch (e) { }
+  // 2) นับ brace depth (ข้าม string) จาก { ตัวแรก — กัน f-string/dict ใน code
+  const start = t.indexOf('{');
+  if (start >= 0) {
+    let depth = 0, inStr = false, esc = false;
+    for (let i = start; i < t.length; i++) {
+      const ch = t[i];
+      if (inStr) {
+        if (esc) esc = false;
+        else if (ch === '\\') esc = true;
+        else if (ch === '"') inStr = false;
+        continue;
+      }
+      if (ch === '"') { inStr = true; continue; }
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) {
+          try {
+            const j = JSON.parse(t.slice(start, i + 1));
+            if (j && j.code) return { lang: String(j.lang || 'python').toLowerCase(), code: String(j.code) };
+          } catch (e) { break; }
+        }
+      }
+    }
+  }
   return null;
 }
 
